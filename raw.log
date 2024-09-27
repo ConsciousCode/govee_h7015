@@ -1,0 +1,1529 @@
+(Some of) my raw reverse-engineering log for posterity.
+
+[Service] 02f00000-0000-0000-0000-00000000fe00 (Handle: 23): Unknown
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff02 (Handle: 26): Unknown (Properties: ['read', 'notify'])
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff00 (Handle: 30): Unknown (Properties: ['read'])
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff03 (Handle: 24): Unknown (Properties: ['read'])
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff01 (Handle: 32): Unknown (Properties: ['write-without-response', 'write'])
+
+[Service] 00010203-0405-0607-0809-0a0b0c0d1910 (Handle: 14): Unknown
+	[Characteristic] 00010203-0405-0607-0809-0a0b0c0d2b11 (Handle: 19): Unknown (Properties: ['read', 'write-without-response', 'write', 'notify'])
+	[Characteristic] 00010203-0405-0607-0809-0a0b0c0d2b10 (Handle: 15): Unknown (Properties: ['read', 'notify'])
+
+[Service] 00001801-0000-1000-8000-00805f9b34fb (Handle: 10): Generic Attribute Profile
+	[Characteristic] 00002a05-0000-1000-8000-00805f9b34fb (Handle: 11): Service Changed (Properties: ['read', 'indicate'])
+---
+
+D3:39:32:35:1A:88
+
+[Service] 00001801-0000-1000-8000-00805f9b34fb (Handle: 10): Generic Attribute Profile
+	[Characteristic] 00002a05-0000-1000-8000-00805f9b34fb (Handle: 11): Service Changed (Properties: ['read', 'indicate'])
+		Read: bytearray(b'\x01\x00\xff\xff')
+
+[Service] 02f00000-0000-0000-0000-00000000fe00 (Handle: 23): Unknown
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff03 (Handle: 24): Unknown (Properties: ['read'])
+		Read: bytearray(b'')
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff00 (Handle: 30): Unknown (Properties: ['read'])
+		Read: bytearray(b'')
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff02 (Handle: 26): Unknown (Properties: ['read', 'notify'])
+		Read: bytearray(b'ntf_enable')
+	[Characteristic] 02f00000-0000-0000-0000-00000000ff01 (Handle: 32): Unknown (Properties: ['write-without-response', 'write'])
+
+[Service] 00010203-0405-0607-0809-0a0b0c0d1910 (Handle: 14): Unknown
+
+First commands:
+Handle 0x14:
+    aa0100
+    aa0600
+    aa0703
+    330914
+    aa23ff
+    aa1200
+    aa1100
+    aa0400
+    aa0100
+    aa0100
+    aa0f00
+    aa4100
+    aa0501
+    330100
+    aa0100
+    aa0600
+    aa0600
+    aa0703
+    330914
+    aa23ff
+    aa1200
+    aa1100
+    aa0400
+    aa0100
+    330101
+    aa0600
+    aa0600
+    aa0100
+    aa0703
+    330914
+    aa23ff
+    aa1200
+    aa1100
+    aa0400
+    aa0100
+    aa0f00
+    aa4100
+    aa0501
+    aa0101
+    aa0100
+    aa0100
+    aa0100
+    aa0100
+---
+0x12: 0100 (write not permitted)
+0x15: 0100 (write not permitted)
+0x16: 0100 (write not permitted)
+0x14: aa0101
+(0x10 notify): aa0101
+0x14: aa0600
+(0x10 notify): aa0631
+0x14: aa0703
+(0x10 notify): aa0703
+0x14: 330914
+(0x10 notify): 330900
+---
+
+Note: found that brightness is modular, not 0xff. Wraps (=0) at 103 and 220, 0 isn't off, seems to be lowest brightness (=1?)
+- 0 = 1
+- 103 = 0
+- 220 = 0
+
+---
+Read directly from snoop log:
+>aa0600
+<aa0631
+>aa0703
+<aa0703
+>330914
+<330900
+>aa23ff
+<aa23ff
+>aa1200
+<aa12ff
+>aa1100
+<aa1100
+>aa0400
+<aa0464
+>aa0100
+>aa0100
+<aa0101
+<aa0101
+>aa0f00
+<aa0f01
+>aa4100
+<aa4101
+>aa0501
+<aa0504
+>330100 (known set_state=off, issued by app for testing)
+>aa0100
+<330100
+>aa0600
+<aa0100
+<aa0631
+>aa0600
+>aa0703
+<aa0631
+<aa0703
+>330914
+<330900
+>aa23ff
+<aa23ff
+>aa1200
+<aa12ff
+>aa1100
+<aa1100
+>aa0400
+<aa0464
+>aa0100
+<aa0100
+>330101 (supposed to be set_state=on, issued by app for testing, but trying to send it during color mode seems to do nothing despite receiving echo?)
+<330100
+>aa0600
+<aa0631
+>aa0600
+>aa0100
+>aa0703
+<aa0631
+<aa0101
+<aa0703
+>330914
+<330900
+>aa23ff
+<aa23ff
+>aa1200
+<aa12ff
+>aa1100
+<aa1100
+>aa0400
+<aa0464
+>aa0100
+<aa0101
+>aa0f00
+<aa0f01
+>aa4100
+<aa4101
+>aa0501
+<aa0504
+>aa0100
+<aa0101
+
+---
+Try:
+brightness
+color
+temperature
+set scene to "illuminate"
+
+>330515
+<330500
+>aaa501
+<aaa501
+>aaa502
+<aaa502
+>aaa503
+<aaa503
+>aaa504
+<aaa504
+>aaa505
+<aaa505
+>330515
+<330500
+>330515
+<330500
+>330515
+<330500
+>330515
+<330500
+>330504
+<330500
+>330464
+<330400
+>a30001
+>a30100
+>a3020f
+>a3ffff
+<a30200
+>330504
+<330500
+>a30001
+>a301ff
+>a302ff
+>a30302
+>a3041d
+>a30529
+>a306ff
+>a3ffff
+<a30200
+>330504
+<330500
+>330504
+<330500
+>330464
+<330400
+
+---
+3305040f
+
+r/04,05,06,07,0e,0f,11,12,23,40,41,a3,a5,ee,ef,ff
+
+Command: r/04,05,06,07,0e,0f,11,12,23,40,41,a3,a5,ee,ef,ff
+Notify (04): 64
+Notify (05): 041608
+Notify (06): 312e30302e3134
+Notify (0e):
+Notify (0f): 02
+Notify (11): 011e0f0f
+Notify (12): 010a0000000a
+Notify (23): 00800000ff
+Notify (40): 001e
+Notify (41): ff
+Notify (a3): 01
+Notify (a500): ff033c00ff00010000010101
+Notify (ee):
+Command: Notify (ef): 000101
+rff
+Command: Notify (ff):
+
+Notify (a500): ff033c00ff00010000010101
+Notify (a501): 64ffffff64ffffff64ffffff
+Notify (a502): 64ffffff64ffffff64ffffff
+Notify (a503): 64ffffff64ffffff64ffffff
+Notify (a504): 64ffffff64ffffff64ffffff
+Notify (a505): 64ffffff64ffffff64ffffff
+Notify (a506): 64ffffff64ffffff64ffffff
+Notify (a507): 64ffffff64ffffff64ffffff
+Notify (a508): 64ffffff64ffffff64ffffff
+Notify (a509): 64ffffff64ffffff64ffffff
+Notify (a50a): 64ffffff64ffffff64ffffff
+Notify (a50b): 166464640864646400646464
+Notify (a50c): 006464640064646400646464
+Notify (a50d): 006464640064641600010101
+Notify (a50e): 000101010303035003ff
+Notify (a50f): 507f00ff180000ffff0000ff
+Notify (a510): 00ffff8b00ff0000ff010101
+Notify (a511): 7f01010100010101ff010101
+Notify (a512): ff0101010001010100010101
+Notify (a513): ff0101010001010100010101
+Notify (a514): 00010101ff01010100010101
+Notify (a515): ff010101ff0101018b010101
+Notify (a516): 00010101ff01010100010101
+
+ color, may be where DIY is stored?
+		00
+			"ff010101ff01010100006009"
+			"ff033c00ff00010000010101"
+		01-05
+			"45ffa23c45ffa23c45ffa23c"
+			"64ffffff64ffffff64ffffff"
+		06-0a = "64ffffff64ffffff64ffffff"
+		0b
+			xx646464yy64646400646464
+			xx = scene id byte 1
+			yy = scene id byte 2 (unused?)
+			"0f4545450045454500454545" // doesn't follow pattern
+			"096464640064646400646464"
+		0c = "ff454545ff646464ff646464"
+			"006464640064646400646464"
+		0d = "006464640064640f0000ffff"
+			00646464006464xx00010101
+			xx = scene id
+		0e = "000101010101004600ff"
+		0f = "46ff000009ff0000ff010101"
+		10 = "00ffff8b00ff0000ff010101"
+		11 = "7f01010100010101ff010101"
+		12 = "ff0101010001010100010101"
+		13 = "ff0101010001010100010101"
+		14 = "00010101ff01010100010101"
+		15 = "ff010101ff0101018b010101"
+		16 = "00010101ff01010100010101"
+		17-ff = "000101010001010100010101"
+---
+Notify (04): 64
+Notify (05): 041608
+Notify (06): 312e30302e3134
+Notify (0e):
+Notify (0f): 02
+Notify (11): 001e0f0f
+Notify (12): 000a0000000a
+Notify (23): 00000000ff
+Notify (40): 001e
+Notify (41): ff
+Notify (a3): 01
+Notify (a500): ff033c00ff00010000010101
+Notify (ee):
+Notify (ef): 000101
+Command: Notify (ff):
+Notify (a500): ff033c00ff00010000010101
+Notify (a501): 64ffffff64ffffff64ffffff
+Notify (a502): 64ffffff64ffffff64ffffff
+Notify (a503): 64ffffff64ffffff64ffffff
+Notify (a504): 64ffffff64ffffff64ffffff
+Notify (a505): 64ffffff64ffffff64ffffff
+Notify (a506): 64ffffff64ffffff64ffffff
+Notify (a507): 64ffffff64ffffff64ffffff
+Notify (a508): 64ffffff64ffffff64ffffff
+Notify (a509): 64ffffff64ffffff64ffffff
+Notify (a50a): 64ffffff64ffffff64ffffff
+Notify (a50b): 166464640864646400646464
+Notify (a50c): 006464640064646400646464
+Notify (a50d): 006464640064641600010101
+Notify (a50e): 000101010303035003ff
+Notify (a50f): 507f00ff180000ffff0000ff
+Notify (a510): 00ffff8b00ff0000ff010101
+Notify (a511): 7f01010100010101ff010101
+Notify (a512): ff0101010001010100010101
+Notify (a513): ff0101010001010100010101
+Notify (a514): 00010101ff01010100010101
+Notify (a515): ff010101ff0101018b010101
+Notify (a516): 00010101ff01010100010101
+
+aa11 00 1e 0f 0f
+3311 ff ff ff ff
+aa11 ff ff f0 f0
+3311 66 66 66 66
+aa11 66 66 66 66
+
+
+00 = "ff0101 01ff01 010100 006009"
+01-05 = "45ffa2 3c45ff a23c45 ffa23c"
+06-0a = "64ffff ff64ff ffff64 ffffff"
+0b = "0f4545 450045 454500 454545"
+0c = "ff4545 45ff64 6464ff 646464"
+0d = "006464 640064 640f00 00ffff"
+0e = "000101 010101 004600 ff"
+0f = "46ff00 0009ff 0000ff 010101"
+10-ff = "000101 010001 010100 010101"
+---
+From repo
+
+DIY mode (multi-packet):
+    KEEPALIVE
+    start:WRITE packet#=0 total#
+    WRITE packet#=1 (name, 0x3b?) (style, mode) speed(0-64) ???=0x18 rgb rgb rgb rg (checksum)
+        style: 00:Fade 01:Jumping 02:Flicker 03:Marquee 04:Music FF:combo?
+            mode: 00:Whole 01:subsaection 02:Circulation
+                note: fade subsection N/A
+            marquee modes: 03:Straight 04:Gathered 05:Dispersive
+            music modes: 06:Spectrum 07:Rolling 08:Rhythm
+
+    [WRITE packet#=2 blue rgb rgb rgb rgb 000]
+    [WRITE packet#=3 comb'4o style/mode?]
+    end:WRITE packet#=0xff
+    CMD_COLOR DIY
+---
+w051501b329ef000000007f7f
+	demonstrated that segment colors go into the a5 multi-register ("color buffer"?) with a prefix of 64 per color for some reason. May be the brightness
+w05150200ff00000000007fffff
+	bright -> string 1 dim green and string 2 bright blue
+w051501ffff0000000000007f
+	set 7/8 of string 1 to dim yellow
+w051501ff0000/00-30/0000007fff
+	only 00 is valid, everything else turns it off
+w051501ff0000000000007fff
+	ra501 = 00ff000000ff000000ff => 00 brightness
+w05150100ff00ff00000000ffff
+	all strings turned off
+w05150100ff000000000000ffff
+	string 1 dim green, string 2 bright green => brightness is not a parameter in this command
+w0515026500000000000000ffff
+	does nothing
+w0515006500000000000000ffff
+	question: replace rr with brightness
+	does nothing
+w0515000000000000000000ffff
+	question: what happens when it's all 00?
+	does nothing
+w051500ce0000000000ffff
+	question: 00 command, replace rrggbb with 1 byte brightness
+	does nothing
+w051502ce0000000000ffff
+	question: try 02 command
+	does nothing
+w051501ce00000000000000ffff
+	sets everything to red, brightness unchanged
+w051501b329ef000000007f7f
+	sets string 10 segments 7f to b329ef, brightness unchanged
+
+w051501rrggbb??????????sstt
+	set segments in bitmaps ss and tt to the given color
+	? unknown bits, sources use all 00
+
+w051501ffcc11123456789affff
+	question: what happens when ?? is not 00?
+	set all segments to bluish, string 1 very dim, string 2 bright
+	ra500 = ff033c00 ff000100 00003412
+	ra501 = 0056789a 0056789a 0056789a # segments 0.00-02
+	ra502 = 0056789a 0056789a 0056789a # segments 0.03-05
+	ra503 = 0056789a 0056789a 6456789a # segments 0.06-07, 1.00
+	ra504 = 6456789a 6456789a 6456789a # segments 1.01-03
+	ra505 = 6456789a 6456789a 6456789a # segments 1.04-06
+	ra506 = 6456789a 64ffffff 64ffffff # segments 1.07-08, unknown
+	
+	this outcome is very weird. It ignores the rrggbb which normally it
+	attends to and used 56789a as the color
+
+w051501fedcba0000000000ffff
+	question: now  try zeroing that
+	everything set to whitish blue
+	ra501 = 00fedcba00fedcba00fedcba
+	...
+	ra504 = 64fedcba64fedcba64fedcba
+
+w051501fedcba9800000000ffff
+	question: unzero
+	everything turns off
+	ra501 = 000101010001010100010101
+	ra504 = 640101016401010164010101
+	note: firmware seems to use 010101 as an "undefined" color
+
+w051501fedcba9876543210ffff
+	unzero everything?
+	string 2 dim warm white, string 1 still off
+	ra501 = 005432100054321000543210
+	ra504 = 645432106454321064543210
+	note: "off" probably an artifact of a low value color
+
+w051501fedcba0076543210ffff
+	unzero just that sus byte
+	no effect
+
+w051501fedcba0000543210ffff
+	unzero both sus bytes?
+	everything is on, still dim/bright
+	ra500 = ff033c00ff00010000010101
+	ra501 = 00fedcba00fedcba00fedcba
+	ra504 = 64fedcba64fedcba64fedcba
+	
+	the colors remain the same even though one of the strings is "off" -
+	how does the firmware keep track of this?
+
+w051501fedcbaff00543210ffff
+	unzero just sus byte 1
+	string 1 turned off
+	ra500 = ff033c00ff000100000000ff
+	ra501 = 005432100054321000543210
+	ra504 = 645432106454321064543210
+	observations: command has two colors separated by two bytes.
+	if those bytes are 00, uses the first color
+	if they're nonzero, uses the second color and also turns off string 1
+	may be an unintended edge case of the firmware, probably just need to
+	 zero everything out
+	"turning off" string 1 appears to be signaled by a500 which gets the
+	 undefined color
+
+w0515000123456789abcdefffff
+	examine command 00
+	ra500 = ff033c00ff000100000000ff
+	ra501 = 005432100054321000543210
+	ra504 = 645432106454321064543210
+	no observed change
+	probably does nothing
+
+w0515020123456789abcdefffff
+	examine command 02
+	turned off segment 2 on string 2?
+	ra500 = ff033c00ff000100000000ff
+	ra501 = 015432100154321000543210
+	ra504 = 645432100154321064543210
+	
+	!!!! the brightness changed!
+
+w05150265ffff
+	hypothesis: first byte is brightness followed by segment bitmaps, rest is ignored
+	everything is the same color/brightness!
+	ra500 = ff033c00ff000100000000ff
+	ra501 = 655432106554321065543210
+	ra504 = 655432106554321065543210
+
+w05150100ff000000000000ffff
+	set to color that isn't low-value
+	everything is max brightness green!
+
+w051502/70-80/ffff
+	examine different brightness values because tests showed that the full range isn't used
+	went to 0 and then up again so modulo = 0 is in this range
+
+w05150270ffff
+w05150271ffff
+w05150272ffff
+	0 brightness here
+
+w05150200ffff
+	dim but not off, now let's compare to 7x to see what it's equivalent to
+
+w05150276ffff - too dim
+w0515027cffff - slightly too bright
+w0515027affff - looks right
+
+Conclusions:
+	71 = max brightness
+	72 = 0 brightness
+	00 <=> 7a brightness
+	7a - 72 = 8 (-1?)
+	therefore 00 = 8 brightness
+	min = 0
+	max = 120
+	
+	float -> int via (round(value*(0x71 + 8)) - 8)%0x7a
+
+We can determine an upper bound for the number of supported strings:
+	Setting colors ~ 33051501rrggbb0000000000 minimum, 12 bytes
+	Messages are capped at 20 bytes total, of which the last is always checksum
+	19 - 12 = 7 bytes for the command, each byte = 1 string
+
+Now let's check the ordering of the bitmap
+w051501ff0000 0000000000 0100
+	(before: all max brightness green)
+	set segment 0 to (dim) red, why dim?
+	ra500 = ff033c00ff00010000010101
+	ra501 = 71ff00007100ff007100ff00
+	brightness is the same, but the color is different
+w05150100ff00 0000000000 0100
+	set segment 0 to max brightness green
+	question: why is the brightness different for red?
+	ra500 = ff033c00ff00010000010101
+	ra501 = 7100ff007100ff007100ff00
+w051501ff0000 0000000000 0200
+	segment 1
+w051501ff0000 0000000000 0400 - segment 2
+w051501ff0000 0000000000 0800 - segment 3
+w051501ff0000 0000000000 1000 - segment 4
+w051501ff0000 0000000000 2000 - segment 5
+w051501ff0000 0000000000 4000 - segment 6
+w051501ff0000 0000000000 8000 - segment 7
+w051501ff0000 0000000001 0001 - segment 8
+w051501ff0000 0000000002 0002 - segment 9
+w051501ff0000 0000000004 0004 - segment 10
+w051501ff0000 0000000008 0008 - segment 11
+w051501ff0000 0000000010 0010 - segment 12
+w051501ff0000 0000000020 0020 - segment 13
+w051501ff0000 0000000040 0040 - segment 14
+w0515010000ff 0000000040 0080 - segment 0 bright GREEN, strange artifact of firmware
+Note: actually 1 string with 15 segments, not 2 strings of 8
+w0515010000ff 0000000040 0100 - segment 0 dim blue
+Note: Copilot randomly inserted non-zeros in the zero block, doesn't seem to have affected it because the first 2 bytes were 00
+Note: Pressing button changes status register but doesn't otherwise send a notification - requires polling
+w0515010000ff 0000000000 ff7f - all segments to dim blue
+w05150100ff00 0000000000 ff7f - all segments to bright green
+w051501ff0000 0000000000 ff7f - all segments to dim red
+UGH WHY
+hypothesis: What if different colors have different interpretations of brightness?
+w05150260ff7f - bright red
+w05150271ff7f - dim red
+w0515026bff7f - very dim
+w0515026aff7f - dimmer
+w05150265ff7f - bright
+w05150268ff7f - almost off
+w05150267ff7f - almost off
+w05150266ff7f - off
+w05150265ff7f - max brightness
+Question: What is 00?
+w05150200ff7f - dim, +8 of off?
+w0515026eff7f - slightly brighter (may have been wrong earlier about +8)
+w0515026dff7f - looks about right
+Question: What does this red's max look like in green?
+w05150100ff00 0000000000 ff7f - all segments to green
+w05150265ff7f - bright green
+w05150271ff7f - flashes slightly, not obviously brighter
+Considering 0x72+ wrapping around to 00 seems to be a firmware quirk, it may also be a quirk that 0x66+ works at all for any colors
+Check blue
+w0515010000ff 0000000000 ff7f - all segments to blue
+w05150266ff7f - turns them all off
+w05150265ff7f - max brightness
+Conclusion: 0x66+ is almost certainly a firmware bug
+
+w0465 turns everything off
+w0464 max brightness
+w0430 roughly half brightness
+
+Conclusion: 04 register is the global brightness level which works in addition to the per-segment brightness
+---
+w05040000
+	dim red
+	ra500 = ff033c00ff00010000010101
+	ra501 = 650000ff650000ff650000ff
+w05040001
+	rotates between white, blue, and purple
+	00: ff033c00ff00010000010101
+	01: 650000ff650000ff650000ff
+	02: 650000ff650000ff650000ff
+	03: 650000ff650000ff650000ff
+	04: 650000ff650000ff650000ff
+	05: 650000ff650000ff650000ff
+	06: 710000ff71ffffff71ffffff
+	07: 71ffffff71ffffff71ffffff
+	08: 71ffffff71ffffff71ffffff
+	09: 71ffffff71ffffff71ffffff
+	0a: 71ffffff71ffffff71ffffff
+	0b: 006565650165656500656565
+	0c: 006565650071717100717171
+	0d: 007171710071710000010101
+	0e: 000101010303035003ff0000
+	0f: 507f00ff180000ffff0000ff
+	10: 00ffff8b00ff0000 (rest undefined color)
+	
+	00 remains unchanged
+	we also see blue, white... but 00656565 is dim white
+---
+Checking scenes by setting them in the app then reading the register:
+- 1608 - twilight
+- 1708 - meteor
+
+ea86
+dec: 60038
+bin: 11101010 10000110
+
+7015
+hex: 1b67
+bin: 00011011 01100111
+
+Nah, not even close
+---
+At this point I finally installed LineageOS on an old Pixel 4 XL so I could use wireshark bluetooth snoop over adb in a dedicated setup. My personal phone was truncating the logs so I couldn't see everything.
+
+Setting a scene in the app:
+>aa01
+<aa0101
+>a300010b020429000100320201ff0003ff0a0ab5
+>a30101a50506ff0000ff7f00ffff0000ff000085
+>a302ffff8b00ff1400fd000880002900010032ae
+>a3030201ffb203ff0a0a01a30506ff0000ff7fcc
+>a30400ffff0000ff0000ffff8b00ff1600fc10d6
+>a3050180012900010032000194940080141400bd
+>a306e71406ff0000ff7f00ffff0000ff0000ff2f
+>a307ff8b00ff000080000080002900021901001c
+>a30801ffff0080141400fc1406ff0000ff7f00bb
+>a309ffff0000ff0000ffff8b00ff0000800000a1
+>a3ff8000000000000000000000000000000000dc
+<a3020000000000000000000000000000000000a1
+>330504110800000000000000000000000000002b
+<3305000000000000000000000000000000000036
+
+This follows the reverse engineering patterns from the repo but does clarify things:
+- keepalive did occur before, but this is every 2 seconds and there's a period of just under 1 second between the response and the next command. It's unlikely the app took that long to continue with the sequence, so it's probably not actually part of it.
+- a3 is the command (not a1 like some other govee products)
+- a300 01 0b 02 ...data is the start packet, containing data
+  - 0b (11) is the packet count including the start and end packets
+  - This is followed by 02, some info suggests other govee products have an 02 constant in the protocol. Cross-referencing with the "candy" params from the API dump, the first byte is 04 which comes after that so 02 is definitely part of the start packet header.
+- a3pp ...data is the ppth packet
+- a3ff ...data is the end packet, containing data
+- ACK of a302, the meaning of 02 is unclear. None of the other repos mention this.
+- followed by a write to 05 to set the mode to 04 (scene) 0x0811 (little endian, "Life - Candy")
+
+Despite seeming to perfectly replicate the collected data, the lights didn't change. It acts as if the a3 command is unrecognized because there's no ACK. Awaiting the ACK at the end just hangs, or times out if the heartbeat is running.
+My attempt to replicate:
+a300010b020429000100320201ff0003ff0a0ab5
+a30101a50506ff0000ff7f00ffff0000ff000085
+a302ffff8b00ff1400fd000880002900010032ae
+a3030201ffb203ff0a0a01a30506ff0000ff7fcc
+a30400ffff0000ff0000ffff8b00ff1600fc10d6
+a3050180012900010032000194940080141400bd
+a306e71406ff0000ff7f00ffff0000ff0000ff2f
+a307ff8b00ff000080000080002900021901001c
+a30801ffff0080141400fc1406ff0000ff7f00bb
+a309ffff0000ff0000ffff8b00ff0000800000a1
+a3ff8000000000000000000000000000000000dc
+
+a300010b020429000100320201ff0003ff0a0ab5
+a30101a50506ff0000ff7f00ffff0000ff000085
+a302ffff8b00ff1400fd000880002900010032ae
+a3030201ffb203ff0a0a01a30506ff0000ff7fcc
+a30400ffff0000ff0000ffff8b00ff1600fc10d6
+a3050180012900010032000194940080141400bd
+a306e71406ff0000ff7f00ffff0000ff0000ff2f
+a307ff8b00ff000080000080002900021901001c
+a30801ffff0080141400fc1406ff0000ff7f00bb
+a309ffff0000ff0000ffff8b00ff0000800000a1
+a3ff8000000000000000000000000000000000dc
+
+The order is wrong! Might be an endianness issue?
+a302000b0429000100320201ff0003ff0a0a00b4
+a30101a50506ff0000ff7f00ffff0000ff000085
+a302ffff8b00ff1400fd000880002900010032ae
+a3030201ffb203ff0a0a01a30506ff0000ff7fcc
+a30400ffff0000ff0000ffff8b00ff1600fc10d6
+a3050180012900010032000194940080141400bd
+a306e71406ff0000ff7f00ffff0000ff0000ff2f
+a307ff8b00ff000080000080002900021901001c
+a30801ffff0080141400fc1406ff0000ff7f00bb
+a309ffff0000ff0000ffff8b00ff0000800000a1
+a3ff8000000000000000000000000000000000dc
+
+I was printing the correct data but writing the wrong data. Now scenes work!!! Then I tried to replicate the collaboration scenes SPICE and ARRAKIS:
+
+SPICE
+Value: a3000106020326000000050201cb3303db1414a5
+Value: a30103001405ff1e07ff3707ff5a07ff3707ff0b
+Value: a3021e07000080000080001a500301020001ff0c
+Value: a303000099141400991401ff32071600fc000095
+Value: a30480001a550301020001ff0000991414009996
+Value: a3ff1401ff31071400fc000080000000000000e8
+Value: 3305041327000000000000000000000000000006
+
+0326000000050201cb3303db141403001405ff1e07ff3707ff5a07ff3707ff1e07000080000080001a500301020001ff000099141400991401ff32071600fc000080001a550301020001ff000099141400991401ff31071400fc000080000000000000
+0x2713 = 10003
+AyYAAAAFAgHLMwPbFBQDABQF/x4H/zcH/1oH/zcH/x4HAACAAACAABpQAwECAAH/AACZFBQAmRQB/zIHFgD8AACAABpVAwECAAH/AACZFBQAmRQB/zEHFAD8AACAAAAAAAAA
+
+ARRAKIS
+Value: a300010402021d000303050001a0a000001414bf
+Value: a30103001402ff8330ff85230000801001ed01df
+Value: a3021a000000010001ff8c01ef14140300070123
+Value: a3ffff631a0000800000800000000000000000da
+Value: 3305041427000000000000000000000000000001
+
+021d000303050001a0a00000141403001402ff8330ff85230000801001ed011a000000010001ff8c01ef141403000701ff631a0000800000800000000000000000
+0x2714 = 10004
+Ah0AAwMFAAGgoAAAFBQDABQC/4Mw/4UjAACAEAHtARoAAAABAAH/jAHvFBQDAAcB/2MaAACAAACAAAAAAAAAAAA=
+
+Trying to deconstruct it after changing the speed:
+
+0326000000050201cb3303
+(c9)
+14140103001405ff1e07ff3707ff5a07ff3707ff021e07000080000080001a500301020001ff03000
+(0801)
+4140
+(0801)
+401ff3207160
+(0f9)
+00000480001a550301020001ff0000
+(80)
+14140
+080f
+f1401ff31071400f9000080000000000000
+
+0326000000050201cb3303
+(db)
+14140103001405ff1e07ff3707ff5a07ff3707ff021e07000080000080001a500301020001ff03000
+(0991)
+4140
+(0991)
+401ff32071600
+(fc)
+00000480001a550301020001ff0000
+(99)
+14140
+(099f)
+f1401ff31071400fc000080000000000000
+
+db
+
+0x2713
+10003
+
+---
+
+021d000303050001a0a0000014140103001402ff8330ff85230000801001f701021a000000010001ff8c01f9141403000701ffff631a0000800000800000000000000000
+
+0x2714
+10004
+
+---
+
+33051501ffffff0fa0ffd5a1ff7f0
+
+Warmest: 330515 01 ffffff 07d0 ff8d0b ff7f 0000000000f3
+AlmostW: 330515 01 ffffff 0960 ffa23c ff7f 000000000055
+HalfC  : 330515 01 ffffff 16a8 fff1e7 ff7f 00000000000a
+Coldest: 330515 01 ffffff 2260 dbe2ff ff7f 0000000000d9
+
+Value: 33051501ffffff1af4faf7ffff7f000000000041
+Value: 33051501ffffff1004ffd7a6ff7f0000000000c7
+Value: 33051501ffffff1004ffd7a6ff7f0000000000c7
+Value: 33051501ffffff0ed8ffd097ff7f000000000033
+Value: 33051501ffffff1f40e5e9ffff7f0000000000f1
+Value: 33051501ffffff1bbcf5f4ffff7f000000000004
+Value: 33051501ffffff0d48ffc682ff7f0000000000a3
+Value: 33051501ffffff2134dfe5ffff7f00000000008d
+Value: 33051501ffffff1ce8eff0ffff7f000000000049
+Value: 33051501ffffff19c8fff9fdff7f000000000077
+Value: 33051501ffffff16a8fff1e7ff7f00000000000a
+Value: 33051501ffffff13ecffe8d0ff7f000000000065
+Value: 33051501ffffff10ccffdbafff7f00000000000a
+Value: 33051501ffffff0d48ffc682ff7f0000000000a3
+Value: 33051501ffffff0a28ffaa4dff7f000000000067
+
+temp color
+1af4 faf7ff
+1004 ffd7a6
+1004 ffd7a6
+0ed8 ffd097
+1f40 e5e9ff
+1bbc f5f4ff
+0d48 ffc682
+2134 dfe5ff
+1ce8 eff0ff
+19c8 fff9fd
+16a8 fff1e7
+13ec ffe8d0
+10cc ffdbaf
+0d48 ffc682
+0a28 ffaa4d
+
+Color
+Undef  : 330515 01 010101 0000 000000 ff7f 0000000000a3
+
+Mic mode:
+Value: 3305050100000000000000000000000000000032
+
+Value: 330505003a000000000000000000000000000009
+Value: 3305050014000000000000000000000000000027
+Value: 3305050064000000000000000000000000000057
+Value: 33050500b4000000000000000000000000000087
+Value: 33050500fe0000000000000000000000000000cd
+Value: 33050500cc0000000000000000000000000000ff
+Value: 330505009a0000000000000000000000000000a9
+
+Value: 3305050054000000000000000000000000000067
+Value: 3305050014000000000000000000000000000027
+Value: 3305050064000000000000000000000000000057
+Value: 33050500b4000000000000000000000000000087
+Value: 33050500fe0000000000000000000000000000cd
+Value: 33050500cc0000000000000000000000000000ff
+Value: 330505009a0000000000000000000000000000a9
+
+Value: 33050500ea0000000000000000000000000000d9
+Value: 33050500fe0000000000000000000000000000cd
+Value: 33050500a0a00000000000000000000000000033
+Value: 3305050078780000000000000000000000000033
+Value: 3305050041410000000000000000000000000033
+Value: 3305050080800000000000000000000000000033
+Value: 33050500bfbf0000000000000000000000000033
+
+Value: 33050500c7c70000000000000000000000000033
+Value: 33050500a0a00000000000000000000000000033
+Value: 3305050078780000000000000000000000000033
+Value: 3305050041410000000000000000000000000033
+Value: 330505000f0f0000000000000000000000000033
+Value: 330505004e4e0000000000000000000000000033
+Value: 33050500c7c70000000000000000000000000033
+
+Value: 3305050000cc00000000000000000000000000ff
+Value: 33050500009a00000000000000000000000000a9
+Value: 3305050000540000000000000000000000000067
+Value: 3305050000140000000000000000000000000027
+Value: 3305050000640000000000000000000000000057
+Value: 3305050000b40000000000000000000000000087
+Value: 3305050000fe00000000000000000000000000cd
+
+Value: 3305050000cc00000000000000000000000000ff
+Value: 33050500009a00000000000000000000000000a9
+Value: 3305050000540000000000000000000000000067
+Value: 3305050000140000000000000000000000000027
+Value: 3305050000640000000000000000000000000057
+Value: 3305050000b40000000000000000000000000087
+
+But reloading the app it suddenly had a different UI and more fleshed-out microphone mode:
+Value: a5028300858534
+Value: a5028300858534
+Value: a502830000143e
+Value: a502830000fe28
+Value: a5028300005680
+Value: a502830000fe28
+Value: a5028300005680
+Value: a502838a00feb2
+Value: a502832e0056ae
+Value: a502830a001448
+Value: a502838a00feb2
+Value: a502838a00feb2
+Value: a502839f9f9f07
+Value: a502830c0c0c4e
+Value: a502839f9f9f07
+Value: a502834f4f4f17
+Value: a50283fe000028
+Value: a502831400003e
+Value: a50283fe000028
+Value: a502830f0f0048
+Value: a50283c7c700b8
+Value: a50283636300f0
+Value: a50283c7c700b8
+Value: a502830014003e
+Value: a5028300fe0028
+Value: a50283007f00a9
+Value: a5028300fe0028
+Value: a50283000f0f48
+Value: a5028300c7c7b8
+Value: a50283006363f0
+Value: a5028300c7c7b8
+Value: a502830000143e
+Value: a502830000fe28
+Value: a502830000143e
+Value: a502830000fe28
+Value: a5028300007fa9
+Value: a502838a00feb2
+Value: a5028345007fee
+Value: a502838a00feb2
+Value: a5028345007fee
+Value: a502839f9f9f07
+Value: a502836060604a
+Value: a502832121218d
+Value: a502839f9f9f07
+---
+turn alarm 1 on
+Value: 3323008000008000000000000000000000000010
+turn alarm 1 off
+Value: 3323000000008000000000000000000000000090
+turn alarm 1 off?
+Value: 3323000000000000000000000000000000000010
+turn alarm 1 on
+Value: 3323018000008000000000000000000000000011
+turn alarm 1 off
+Value: 3323010000008000000000000000000000000091
+
+turn alarm 1 on
+Value: 3323008000000000000000000000000000000090
+turn alarm 1 off
+Value: 3323000000000000000000000000000000000010
+turn alarm 2 on
+Value: 3323018000008000000000000000000000000011
+turn alarm 2 off
+Value: 3323010000008000000000000000000000000091
+turn alarm 1 on
+Value: 3323008000000000000000000000000000000090
+turn alarm 2 on
+Value: 3323018000008000000000000000000000000011
+turn alarm 1 off
+Value: 3323000000000000000000000000000000000010
+turn alarm 2 off
+Value: 3323010000008000000000000000000000000091
+
+turn alarm 1 on
+Value: 3323008000000000000000000000000000000090
+turn alarm 2 on
+Value: 3323018000008000000000000000000000000011
+turn alarm 3 on
+Value: 3323028000008000000000000000000000000012
+turn alarm 4 on
+Value: 3323038000008000000000000000000000000013
+
+"wake up" at 00:00
+Value: 331201640000800a0000000000000000000000ce
+"sleeping" (turn off after 15 minutes)
+Value: 3311011e0f0f000000000000000000000000003d
+
+turn off sleeping
+Value: 3311001e0f0f000000000000000000000000003c
+turn off wake up no repeat wake-up at 00:00 for duration 10, no repeat, final brightness 100
+Value: 331200640000800a0000000000000000000000cf
+turn alarm 4 off
+Value: 3323030000008000000000000000000000000093
+turn alarm 3 off
+Value: 3323020000008000000000000000000000000092
+turn alarm 2 off
+Value: 3323010000008000000000000000000000000091
+turn alarm 1 off
+Value: 3323000000000000000000000000000000000010
+
+turn on wake-up at 15:21 repeat tues thurs fri, duration 11 minutes, final brightness 70
+Value: 331201460f159a0b0000000000000000000000ed
+
+(weekday bit masks)
+wake-up no repeat
+10000000
+wake-up repeat tues/thurs/fri
+10011010
+
+Value: 3311011e1313000000000000000000000000003d
+---
+power-off memory off
+Value: 3341000000000000000000000000000000000072
+power-off memory on
+Value: 3341010000000000000000000000000000000073
+---
+Wrote scene "twilight"
+For reference, twilight is:
+Sending: a3000103020120000000010001ff4c03ca0805f5
+Sending: a30100cb0503ffbf07ff7f00ff60070000ff00cf
+Sending: a3ff00ed010000000000000000000000000000b0
+ra5/00-ff
+Notify (aaa500): cb033c00ca0001000000280a
+Notify (aaa501): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa502): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa503): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa504): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa505): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa506): 71f2cbca71f2cbca71f2cbca
+Notify (aaa507): 71f2cbca71f2cbca71f2cbca
+Notify (aaa508): 71f2cbca71f2cbca71f2cbca
+Notify (aaa509): 71f2cbca71f2cbca71f2cbca
+Notify (aaa50a): 71f2cbca71f2cbca71f2cbca
+Notify (aaa50b): 166464640864646400646464
+Notify (aaa50c): b46464640071717100717171
+Notify (aaa50d): 00717171007171160000b400
+Notify (aaa50e): 000101010101004600ff0000
+Notify (aaa50f): 46ff000009ff0000ff010101
+Notify (aaa510): 000101010001010100010101
+Notify (aaa511): ff0101010001010100010101
+Notify (aaa512): 00010101ff01010100010101
+Notify (aaa513): 000101010001010100010101
+Notify (aaa514): 000101010001010100010101
+Notify (aaa515): 000101010001010100010101
+Notify (aaa516): 000101010001010100010101
+Notify (aaa517): 000101010001010100010101
+Notify (aaa518): 000101010001010100010101
+Notify (aaa519): 000101010001010100010101
+Notify (aaa51a): 000101010001010100010101
+Notify (aaa51b): 000101010001010100010101
+Notify (aaa51c): 000101010001010100010101
+Notify (aaa51d): 000101010001010100010101
+Notify (aaa51e): 000101010001010100010101
+Notify (aaa51f): 000101010001010100010101
+Notify (aaa520): 000101010001010100010101
+Notify (aaa521): 000101010001010100010101
+Notify (aaa522): 000101010001010100010101
+Notify (aaa523): 000101010001010100010101
+Notify (aaa524): 000101010001010100010101
+Notify (aaa525): 000101010001010100010101
+Notify (aaa526): 000101010001010100010101
+Notify (aaa527): 000101010001010100010101
+Notify (aaa528): 000101010000800000008000
+Notify (aaa529): 00008000000f159a00ff001e
+Notify (aaa52a): 00de01010001032e0001fa00
+Notify (aaa52b): 004600200001010100290001
+Notify (aaa52c): 00010101000f000000d04e01
+Notify (aaa52d): 000101010001010100010101
+Notify (aaa52e): 000101010001010100010101
+Notify (aaa52f): 000101010001010100010101
+Notify (aaa530): 000101010000140000010101
+Notify (aaa531): 00d34e010001200000000100
+Notify (aaa532): 00ff4c0300080500000503ff
+Notify (aaa533): 0007ff7f00ff60070000ff00
+Notify (aaa534): 00ed01000001010100010101
+Notify (aaa535): 000101010001010100010101
+Notify (aaa536): 000101010001010100010101
+Notify (aaa537): 000101010001010100010101
+Notify (aaa538): 000101010001010100010101
+Notify (aaa539): 000101010001010100010101
+Notify (aaa53a): 000101010001010100010101
+Notify (aaa53b): 000101010001010100010101
+Notify (aaa53c): 000101010001010100010101
+Notify (aaa53d): 000101010001010100010101
+Notify (aaa53e): 000101010001010100010101
+Notify (aaa53f): 000101010001010100010101
+Notify (aaa540): 000101010001010100010101
+Notify (aaa541): 000101010001010100010101
+Notify (aaa542): 000101010001010100010101
+Notify (aaa543): 000101010001010100010101
+Notify (aaa544): 000101010001010100010101
+Notify (aaa545): 000101010001010100010101
+Notify (aaa546): 000101010001010100010101
+Notify (aaa547): 000101010001010100010101
+Notify (aaa548): 000101010001010100010101
+Notify (aaa549): 000101010001010100010101
+Notify (aaa54a): 000101010001010100010101
+Notify (aaa54b): 000101010001010100010101
+Notify (aaa54c): 000101010001010100010101
+Notify (aaa54d): 000101010001010100010101
+Notify (aaa54e): 000101010001010100010101
+Notify (aaa54f): 000101010001010100010101
+Notify (aaa550): 000101010001010100010101
+Notify (aaa551): 000101010001010100010101
+Notify (aaa552): 000101010001010100010101
+Notify (aaa553): 000101010001010100010101
+Notify (aaa554): 000101010001010100010101
+Notify (aaa555): 000101010001010100010101
+Notify (aaa556): 000101010001010100010101
+Notify (aaa557): 000101010001010100010101
+Notify (aaa558): 000101010001010100010101
+Notify (aaa559): 000101010001010100010101
+Notify (aaa55a): 000101010001010100010101
+Notify (aaa55b): 000101010001010100010101
+Notify (aaa55c): 000101010001010100010101
+Notify (aaa55d): 000101010001010100010101
+Notify (aaa55e): 000101010001010100010101
+Notify (aaa55f): 000101010001010100010101
+Notify (aaa560): 000101010001010100010101
+Notify (aaa561): 000101010001010100010101
+Notify (aaa562): 000101010001010100010101
+Notify (aaa563): 000101010001010100010101
+Notify (aaa564): 000101010001010100010101
+Notify (aaa565): 000101010001010100010101
+Notify (aaa566): 000101010001010100010101
+Notify (aaa567): 000101010001010100010101
+Notify (aaa568): 000101010001010100010101
+Notify (aaa569): 000101010001010100010101
+Notify (aaa56a): 000101010001010100010101
+Notify (aaa56b): 000101010001010100010101
+Notify (aaa56c): 000101010001010100010101
+Notify (aaa56d): 000101010001010100010101
+Notify (aaa56e): 000101010001010100010101
+Notify (aaa56f): 000101010001010100010101
+Notify (aaa570): 000101010001010100010101
+Notify (aaa571): 000101010001010100010101
+Notify (aaa572): 000101010001010100010101
+Notify (aaa573): 000101010001010100010101
+Notify (aaa574): 000101010001010100010101
+Notify (aaa575): 000101010001010100010101
+Notify (aaa576): 000101010001010180010101
+Notify (aaa577): 000101010001010100010101
+Notify (aaa578): 800101010001010100010101
+Notify (aaa579): 000101018001010100010101
+Notify (aaa57a): 460101010f01010115010101
+Notify (aaa57b): 9a0101010b010101ff010101
+Notify (aaa57c): 000101011e010101de010101
+Notify (aaa57d): de0101010101010101010101
+Notify (aaa57e): 010101010101010103010101
+Notify (aaa57f): 360101010101010101010101
+Notify (aaa580): fa0101010001010114010101
+Notify (aaa581): 460101010001010120010101
+Notify (aaa582): 640101010001010100010101
+Notify (aaa583): 000101016901010129010101
+Notify (aaa584): 000101010101010100010101
+Notify (aaa585): 000101010001010100010101
+Notify (aaa586): 020101010f01010100000300
+Notify (aaa587): 00f44e01e4020000f3010101
+Notify (aaa588): 4e0101010101010114010101
+Notify (aaa589): 000101010001010100010101
+Notify (aaa58a): 000101010001010100010101
+Notify (aaa58b): 000101010001010100010101
+Notify (aaa58c): 000101010001010100010101
+Notify (aaa58d): 000101010001010100010101
+Notify (aaa58e): 800101010001010100010101
+Notify (aaa58f): 000101010001010100010101
+Notify (aaa590): 000101010001010100010101
+Notify (aaa591): 000101010001010100010101
+Notify (aaa592): 000101010001010100010101
+Notify (aaa593): 000101010001010100010101
+Notify (aaa594): 000101010001010100010101
+Notify (aaa595): 000101010001010100010101
+Notify (aaa596): 000101010001010114010101
+Notify (aaa597): 000101010101010100010101
+Notify (aaa598): 0001010100010101c2010101
+Notify (aaa599): fb0101014e01010101010101
+Notify (aaa59a): 020101010101010120010101
+Notify (aaa59b): 000101010001010100010101
+Notify (aaa59c): 010101010001010101010101
+Notify (aaa59d): ff0101014c01010103010101
+Notify (aaa59e): ca0101010801010105010101
+Notify (aaa59f): 00010101cb01010105010101
+Notify (aaa5a0): 03010101ff010101bf010101
+Notify (aaa5a1): 07010101ff0101017f010101
+Notify (aaa5a2): 00010101ff01010160010101
+Notify (aaa5a3): 070101010001010100010101
+Notify (aaa5a4): ff0101010001010100010101
+Notify (aaa5a5): ed0101010101010100010101
+Notify (aaa5a6): 000101010001010100010101
+Notify (aaa5a7): 000101010001010100010101
+Notify (aaa5a8): 000101010001010100010101
+Notify (aaa5a9): 000101010001010100010101
+Notify (aaa5aa): 000101010001010100010101
+Notify (aaa5ab): 000101010001010100010101
+Notify (aaa5ac): 000101010001010100010101
+Notify (aaa5ad): 000101010001010100010101
+Notify (aaa5ae): 000101010001010100010101
+Notify (aaa5af): 000101010001010100010101
+Notify (aaa5b0): 000101010001010100010101
+Notify (aaa5b1): 000101010001010100010101
+Notify (aaa5b2): 000101010001010100010101
+Notify (aaa5b3): 000101010001010100010101
+Notify (aaa5b4): 000101010001010100010101
+Notify (aaa5b5): 000101010001010100010101
+Notify (aaa5b6): 000101010001010100010101
+Notify (aaa5b7): 000101010001010100010101
+Notify (aaa5b8): 000101010001010100010101
+Notify (aaa5b9): 000101010001010100010101
+Notify (aaa5ba): 000101010001010100010101
+Notify (aaa5bb): 000101010001010100010101
+Notify (aaa5bc): 000101010001010100010101
+Notify (aaa5bd): 000101010001010100010101
+Notify (aaa5be): 000101010001010100010101
+Notify (aaa5bf): 000101010001010100010101
+Notify (aaa5c0): 000101010001010100010101
+Notify (aaa5c1): 000101010001010100010101
+Notify (aaa5c2): 000101010001010100010101
+Notify (aaa5c3): 000101010001010100010101
+Notify (aaa5c4): 000101010001010100010101
+Notify (aaa5c5): 000101010001010100010101
+Notify (aaa5c6): 000101010001010100010101
+Notify (aaa5c7): 000101010001010100010101
+Notify (aaa5c8): 000101010001010100010101
+Notify (aaa5c9): 000101010001010100010101
+Notify (aaa5ca): 000101010001010100010101
+Notify (aaa5cb): 000101010001010100010101
+Notify (aaa5cc): 000101010001010100010101
+Notify (aaa5cd): 000101010001010100010101
+Notify (aaa5ce): 000101010001010100010101
+Notify (aaa5cf): 000101010001010100010101
+Notify (aaa5d0): 000101010001010100010101
+Notify (aaa5d1): 000101010001010100010101
+Notify (aaa5d2): 000101010001010100010101
+Notify (aaa5d3): 000101010001010100010101
+Notify (aaa5d4): 000101010001010100010101
+Notify (aaa5d5): 000101010001010100010101
+Notify (aaa5d6): 000101010001010100010101
+Notify (aaa5d7): 000101010001010100010101
+Notify (aaa5d8): 000101010001010100010101
+Notify (aaa5d9): 000101010001010100010101
+Notify (aaa5da): 000101010001010100010101
+Notify (aaa5db): 000101010001010100010101
+Notify (aaa5dc): 000101010001010100010101
+Notify (aaa5dd): 000101010001010100010101
+Notify (aaa5de): 000101010001010100010101
+Notify (aaa5df): 000101010001010100010101
+Notify (aaa5e0): 000101010001010100010101
+Notify (aaa5e1): 000101010001010100010101
+Notify (aaa5e2): 000101010001010100010101
+Notify (aaa5e3): 000101010001010100010101
+Notify (aaa5e4): 000101010001010100010101
+Notify (aaa5e5): 000101010001010100010101
+Notify (aaa5e6): 000101010001010100010101
+Notify (aaa5e7): 000101010001010100010101
+Notify (aaa5e8): 000101010001010100010101
+Notify (aaa5e9): 000101010001010100010101
+Notify (aaa5ea): 000101010001010100010101
+Notify (aaa5eb): 000101010001010100010101
+Notify (aaa5ec): 000101010001010100010101
+Notify (aaa5ed): 000101010001010100010101
+Notify (aaa5ee): 000101010001010100010101
+Notify (aaa5ef): 000101010001010100010101
+Notify (aaa5f0): 000101010001010100010101
+Notify (aaa5f1): 000101010001010100010101
+Notify (aaa5f2): 000101010001010100010101
+Notify (aaa5f3): 000101010001010100010101
+Notify (aaa5f4): 000101010001010100010101
+Notify (aaa5f5): 000101010001010100010101
+Notify (aaa5f6): 000101010001010100010101
+Notify (aaa5f7): 000101010001010100010101
+Notify (aaa5f8): 000101010001010100010101
+Notify (aaa5f9): 000101010001010100010101
+Notify (aaa5fa): 000101010001010100010101
+Notify (aaa5fb): 000101010001010100010101
+Notify (aaa5fc): 000101010001010100010101
+Notify (aaa5fd): 000101010001010100010101
+Notify (aaa5fe): 000101010001010100010101
+Notify (aaa5ff): 000101010001010100010101
+
+Stripping out undefined and header stuff:
+
+Sending: 0120000000010001ff4c03ca0805
+Sending: 00cb0503ffbf07ff7f00ff60070000ff00
+Sending: 00ed010000000000000000000000000000
+ra5/00-ff
+Notify (aaa500): cb033c00ca0001000000280a <-- cb occurrence 1, ca occurrence 1
+Notify (aaa501): 64ffaa4d64ffaa4d64ffaa4d     also worth noting 01 occurs here
+Notify (aaa502): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa503): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa504): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa505): 64ffaa4d64ffaa4d64ffaa4d
+Notify (aaa506): 71f2cbca71f2cbca71f2cbca
+Notify (aaa507): 71f2cbca71f2cbca71f2cbca
+Notify (aaa508): 71f2cbca71f2cbca71f2cbca
+Notify (aaa509): 71f2cbca71f2cbca71f2cbca
+Notify (aaa50a): 71f2cbca71f2cbca71f2cbca
+Notify (aaa50b): 166464640864646400646464
+Notify (aaa50c): b46464640071717100717171
+Notify (aaa50d): 00717171007171160000b400
+Notify (aaa50e): 000101010101004600ff0000
+Notify (aaa50f): 46ff000009ff0000ff010101
+Notify (aaa511): ff0101010001010100010101
+Notify (aaa512): 00010101ff01010100010101
+Notify (aaa528): 000101010000800000008000
+Notify (aaa529): 00008000000f159a00ff001e
+Notify (aaa52a): 00de01010001032e0001fa00
+Notify (aaa52b): 004600200001010100290001
+Notify (aaa52c): 00010101000f000000d04e01
+Notify (aaa530): 000101010000140000010101
+Notify (aaa531): 00d34e010001200000000100
+Notify (aaa532): 00ff4c0300080500000503ff
+Notify (aaa533): 0007ff7f00ff60070000ff00
+Notify (aaa534): [00ed0100] 0001010100010101 <-- [end of twilight scene]
+Notify (aaa576): 000101010001010180010101
+Notify (aaa578): 800101010001010100010101
+Notify (aaa579): 000101018001010100010101
+Notify (aaa57a): 460101010f01010115010101
+Notify (aaa57b): 9a0101010b010101ff010101
+Notify (aaa57c): 000101011e010101de010101
+Notify (aaa57d): de0101010101010101010101
+Notify (aaa57e): 010101010101010103010101
+Notify (aaa57f): 360101010101010101010101
+Notify (aaa580): fa0101010001010114010101
+Notify (aaa581): 460101010001010120010101
+Notify (aaa582): 640101010001010100010101
+Notify (aaa583): 000101016901010129010101
+Notify (aaa584): 000101010101010100010101
+Notify (aaa586): 020101010f01010100000300
+Notify (aaa587): 00f44e01e4020000f3010101
+Notify (aaa588): 4e0101010101010114010101
+Notify (aaa598): 0001010100010101c2010101
+Notify (aaa599): fb0101014e01010101010101
+Notify (aaa59a): 020101010101010120010101
+Notify (aaa59c): 010101010001010101010101
+Notify (aaa59d): ff0101014c01010103010101
+Notify (aaa59e): [ca] 0101010801010105010101 <-- [ca] occurrence 2, also has 01, undef bright
+Notify (aaa59f): 00010101 [cb]010101 05010101 <-- [cb] occurrence 2, undef bright
+Notify (aaa5a0): 03010101ff010101 [bf]010101 <-- only occurrence of [bf] but
+Notify (aaa5a1): 07010101ff0101017f010101         brightness value of undefined color
+Notify (aaa5a2): 00010101ff01010160010101
+Notify (aaa5a3): 070101010001010100010101
+Notify (aaa5a4): ff0101010001010100010101
+Notify (aaa5a5): ed0101010101010100010101
+
+Zoom in, ENHANCE:
+
+Sending: <01200000000100> 01 [ff4c03] ca {0805
+Sending: 00} cb |0503ff| bf (07ff7f00ff60070000ff00)
+Sending: /00ed010000/
+
+Notify (aaa531): 00d34e0100 <01200000000100> <-- start
+Notify (aaa532): 00 [ff4c03] 00 {080500} 00 |0503ff| <-- [^1]
+Notify (aaa533): 00 (07ff7f00ff60070000ff00) <-- this zero ~= bf
+Notify (aaa534): /00ed0100/ 0001010100010101 <-- end
+
+We see here ALMOST everything...
+
+[^1]: The three intermediate 00s in this sub-register correspond to our missing values, 01, cb, and bf. Where are they?
+
+May need to reverse engineer scene param values first.
+Trying a more complicated scene:
+
+set scene to "candy", a3 and header stuff stripped
+042900 01 003202 01 ff0003 ff 0a0a b5
+01 a5 0506ff 00 00ff7f 00 ffff00 00 ff0000
+ff ff8b00 ff 1400fd 00 088000 29 000100 32
+0201ff b2 03ff0a 0a 01a305 06 ff0000 ff 7f-
+00ff ff 0000ff 00 00ffff 8b 00ff16 00 fc10-
+01 80 012900 01 003200 01 949400 80 141400
+e7 1406ff 00 00ff7f 00 ffff00 00 ff0000 ff
+ff8b00 ff 000080 00 008000 29 000219 01 00-
+01ff ff 008014 14 00fc14 06 ff0000 ff 7f00-
+ff ff 0000ff 00 00ffff 8b 00ff00 00 800000
+800000 ...00000
+
+3305041108
+ra5/01-ff, found this section
+Notify (aaa531): 00 291e00 00[042900 00 003202 <-- start
+Notify (aaa532): 00 ff0003 00 0a0a 0100 0506ff
+Notify (aaa533): 00 00ff7f 00 ffff00 00 ff0000
+Notify (aaa534): 00 ff8b00 00 1400fd 00 088000
+Notify (aaa535): 00 000100 00 0201ff 00 03ff0a
+Notify (aaa536): 00 01a305 00 ff0000 00 7f00ff
+Notify (aaa537): 00 0000ff 00 00ffff 00 00ff16
+Notify (aaa538): 00 fc1001 00 012900 00 003200
+Notify (aaa539): 00 949400 00 141400 00 1406ff
+Notify (aaa53a): 00 00ff7f 00 ffff00 00 ff0000
+Notify (aaa53b): 00 ff8b00 00 000080 00 008000
+Notify (aaa53c): 00 000219 00 0001ff 00 008014
+Notify (aaa53d): 00 00fc14 00 ff0000 00 7f00ff
+Notify (aaa53e): 00 0000ff 00 00ffff 00 00ff00
+Notify (aaa53f): 00 800000]00 010101 00 010101 <-- end
+
+This time around I noticed that the differences between the bytes of what I sent and what appeared in the color buffer were always 0s in the buffer and always on a 0 mod 4 alignment. Above I add spaces to demonstrate which makes it seem like most of these are actually colors, which tracks since if you recall the segment section has 1 byte of brightness and 3 bytes rgb, so these are as if the brightness is always 0.
+
+Pulling out the changed bytes, mostly zeroed:
+
+01 01 ff [b5 -> 01] 01 <a5 inserted?> 00 00 00 ff ff 00 29 32 b2 0a 06 ff ff 00 8b 00 80 01 01 80 e7 00 00 00 ff ff 00 29 01 ff 14 06 ff ff 00 8b 00 ??
+
+042900 01 003202 01 ff0003 ff 0a0a b5
+01 a5 0506ff 00 00ff7f 00 ffff00 00 ff0000
+ff ff8b00 ff 1400fd 00 088000 29 000100 32
+0201ff b2 03ff0a 0a 01a305 06 ff0000 ff 7f-
+00ff ff 0000ff 00 00ffff 8b 00ff16 00 fc10-
+01 80 012900 01 003200 01 949400 80 141400
+e7 1406ff 00 00ff7f 00 ffff00 00 ff0000 ff
+ff8b00 ff 000080 00 008000 29 000219 01 00-
+01ff ff 008014 14 00fc14 06 ff0000 ff 7f00-
+ff ff 0000ff 00 00ffff 8b 00ff00 00 800000
+800000 ...00000
+
+Looking at some of the particularly unusual changed bytes:
+Notify (aaa587): 00541e0048 0a 000053010101
+Notify (aaa59a): 0201010104010101 29 010101
+Notify (aaa59c): 32 0101010201010101010101
+Notify (aaa59e): ff010101 0a 010101 0a 010101
+Notify (aaa59f): 01010101 a5 01010105010101
+Notify (aaa5a5): ff010101 8b 01010100010101
+Notify (aaa5a8): 8001010100010101 29 010101
+Notify (aaa5aa): 32 0101010201010101010101
+Notify (aaa5ab): ff010101 b2 01010103010101
+Notify (aaa5ac): ff010101 0a 010101 0a 010101
+Notify (aaa5ad): 01010101 a3 01010105010101
+Notify (aaa5b3): ff010101 8b 01010100010101
+Notify (aaa5b6): 8001010101010101 29 010101
+Notify (aaa5b8): 32 0101010001010101010101
+Notify (aaa5bb): 00010101 e7 01010114010101
+Notify (aaa5c1): ff010101 8b 01010100010101
+Notify (aaa5c4): 8001010100010101 29 010101
+Notify (aaa5cf): ff010101 8b 01010100010101
+
+b5 doesn't appear anywhere
+
+Vague impressions of patterns but nothing much. What if we pull out only the brightness bytes for everything after 40 where the scene data ends?
+
+01 01 ff [b5 -> 01] 01 <a5 inserted?> 00 00 00 ff ff 00 29 32 b2 0a 06 ff ff 00 8b 00 80 01 01 80 e7 00 00 00 ff ff 00 29 01 ff 14 06 ff ff 00 8b 00 ??
+
+40-75 is all 00s
+Notify (aaa576):00 00 80
+Notify (aaa577):00 00 00
+Notify (aaa578):80 00 00
+Notify (aaa579):00 80 00
+Notify (aaa57a):46 0f 15
+Notify (aaa57b):9a 0b ff
+Notify (aaa57c):00 1e de
+Notify (aaa57d):de 01 01
+Notify (aaa57e):00 00 00
+Notify (aaa57f):00 00 00
+Notify (aaa580):00 00 14
+Notify (aaa581):46 00 20
+Notify (aaa582):64 00 00
+Notify (aaa583):00 69 29
+Notify (aaa584):00 01 00
+Notify (aaa585):00 00 00
+Notify (aaa586): 02 010101 0f 010101 00 000b00 <-- very unusual, color data
+Notify (aaa587): 00 541e00 48 0a0000 53 010101     isn't undefined
+Notify (aaa588):1e 00 14
+Notify (aaa589):00 00 00
+Notify (aaa58a):00 00 00
+Notify (aaa58b):00 00 00
+Notify (aaa58c):00 00 00
+Notify (aaa58d):00 00 00
+Notify (aaa58e):80 00 00
+Notify (aaa58f):00 00 00
+Notify (aaa590):00 00 00
+Notify (aaa591):00 00 00
+Notify (aaa592):00 00 00
+Notify (aaa593):00 00 00
+Notify (aaa594):00 00 00
+Notify (aaa595):00 00 00
+Notify (aaa596):00 00 14
+Notify (aaa597):00 01 00
+Notify (aaa598):00 00 11 | .. .. 11 +16 from 01 = 11
+Notify (aaa599):5e 1e 00 | .. .. 00
+Notify (aaa59a):02 04 29 | .. .. 29 +16 from 11 = 02
+Notify (aaa59b):00 01 00 | .. .. .. +16 from 01 = 01 <-- start of bright data
+Notify (aaa59c):32 02 01 | 32 .. .. +16 from 01 = 01
+Notify (aaa59d):ff 00 03 |
+Notify (aaa59e):ff 0a 0a | ff .. .. +16 from 01 = ff, but should be 01?
+Notify (aaa59f):01 a5 05 | .. a5 .. +16 from ff = a5
+Notify (aaa5a0):06 ff 00 | .. .. 00 +16 from a5 = 00
+Notify (aaa5a1):00 ff 7f | 
+Notify (aaa5a2):00 ff ff | 00 .. .. +16 from 00 = 00
+Notify (aaa5a3):00 00 ff | .. 00 .. +16 from 00 = 00
+Notify (aaa5a4):00 00 ff | .. .. ff +16 from 00 = ff
+Notify (aaa5a5):ff 8b 00 | ff .. 00
+Notify (aaa5a6):ff 14 00 | ff .. 00 +16 from ff = ff
+Notify (aaa5a7):fd 00 08 | .. 00 .. +16 from ff = 00
+Notify (aaa5a8):80 00 29 | .. 00 29 +16 from 00 = 29
+Notify (aaa5a9):00 01 00 | .. .. ..
+Notify (aaa5aa):32 02 01 | 32 .. .. +16 from 29 = 32
+Notify (aaa5ab):ff b2 03 | .. b2 .. +16 from 32 = b2
+Notify (aaa5ac):ff 0a 0a | .. 0a 0a +16 from b2 = 0a
+Notify (aaa5ad):01 a3 05 | .. .. ..
+Notify (aaa5ae):06 ff 00 | 06 ff .. +16 from 0a = 06
+Notify (aaa5af):00 ff 7f | 00 ff .. +16 from 06 = ff
+Notify (aaa5b0):00 ff ff | 00 ff ff +16 from ff = ff
+Notify (aaa5b1):00 00 ff | 00 00 ff
+Notify (aaa5b2):00 00 ff | 00 00 ff +16 from ff = 00
+Notify (aaa5b3):ff 8b 00 | .. 8b .. +16 from 00 = 8b
+Notify (aaa5b4):ff 16 00 | .. .. 00 +16 from 8b = 00
+Notify (aaa5b5):fc 10 01
+Notify (aaa5b6):80 01 29 | 80 01 .. +16 from 00 = 80
+Notify (aaa5b7):00 01 00 | .. 01 .. +16 from 80 = 01
+Notify (aaa5b8):32 00 01 | .. .. 01 +16 from 01 = 01
+Notify (aaa5b9):94 94 00
+Notify (aaa5ba):80 14 14 | 80 .. .. +16 from 01 = 80
+Notify (aaa5bb):00 e7 14 | .. e7 .. +16 from 80 = e7
+Notify (aaa5bc):06 ff 00 | .. .. 00 +16 from e7 = 00
+Notify (aaa5bd):00 ff 7f | 00 ff ..
+Notify (aaa5be):00 ff ff | 00 ff ff +16 from 00 = 00
+Notify (aaa5bf):00 00 ff | 00 00 ff +16 from 00 = 00
+Notify (aaa5c0):00 00 ff | 00 00 ff +16 from 00 = ff
+Notify (aaa5c1):ff 8b 00
+Notify (aaa5c2):ff 00 00 | ff .. .. +16 from ff = ff
+Notify (aaa5c3):80 00 00 | .. 00 .. +16 from ff = 00
+Notify (aaa5c4):80 00 29 | .. 00 29 +16 from 00 = 29
+Notify (aaa5c5):00 02 19
+Notify (aaa5c6):01 00 01 | 01 .. 01 +16 from 29 = 01
+Notify (aaa5c7):ff ff 00 | ff ff .. +16 from 01 = ff
+Notify (aaa5c8):80 14 14 | .. 14 14 +16 from ff = 14
+Notify (aaa5c9):00 fc 14 | .. .. 14
+Notify (aaa5ca):06 ff 00 | 06 .. .. +16 from 14 = 06
+Notify (aaa5cb):00 ff 7f | .. ff .. +16 from 06 = ff
+Notify (aaa5cc):00 ff ff | .. ff ff +16 from ff = ff
+Notify (aaa5cd):00 00 ff | .. .. ff
+Notify (aaa5ce):00 00 ff | 00 .. ff +16 from ff = 00
+Notify (aaa5cf):ff 8b 00 | ff 8b 00 +16 from 00 = 8b
+Notify (aaa5d0):ff 00 00 | .. 00 00 +16 from 8b = 00
+Notify (aaa5d1):80 00 00
+Notify (aaa5d2):80 00 00
+everything d3+ is also 00s
+
+Just laying all this out and taking the time to annotate it, this does appear to be an alignment issue between 16 and 12 bytes.
+
+Scene (color?) data begins at a531+4
+This (brightness?) data begins at a59b+4
+Something about the 0a0a b5 01 sequence seems to be special - 0a0a is stored with the colors, but b5 is not, followed by 01 which is, as if b5 is "interrupting" an ordinary 3 byte rgb sequence, but this is more likely non-color data. The fact that b5 appears *nowhere* in the dump is concerning, though. There's also no indication currently of what the other bytes are doing.
+
+a500 didn't change either, so the ocurrence of ca/cb from "twilight" was a coincidence.
+In "twilight" we did find ca/cb around a59e+0 and a59f+4 which is perfectly in line with what we discovered here.
+
+What is analogous to the mysterious b5 byte in twilight?
+twilight: 012000 00 000100 01 ff4c03 ca 0805 00 cb 0503ff bf 07ff7f00ff60070000ff00
+candy   : 042900 01 003202 01 ff0003 ff 0a0a b5
+
+00... well then.

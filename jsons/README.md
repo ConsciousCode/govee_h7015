@@ -1,0 +1,3 @@
+Govee API JSON dumps courtesy of [this](https://github.com/Beshelmek/govee_ble_lights) homeassistant integration.
+
+`consolidate.py` attempts to read all the JSON files, strip them of unnecessary information, and consolidate them into a single JSON file. Unfortunately this results in a 47 MB file out of 51 MB when they're separated, and there's much less duplication than you'd think. What duplication exists isn't consistent enough to consolidate.
