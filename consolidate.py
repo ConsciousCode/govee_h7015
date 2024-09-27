@@ -1,8 +1,9 @@
-import base64
+'''
+Utility script for convering /jsons/* from [govee_ble_lights (Homeassistant)](https://github.com/Beshelmek/govee_ble_lights/) to a more straightforward format in /scenes/*.
+'''
 import os
 import json
 from typing import Literal, NotRequired, TypedDict
-from collections import Counter
 
 ## Govee API dump types ##
 # Note that the mispellings are from the API dump

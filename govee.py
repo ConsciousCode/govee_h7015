@@ -636,7 +636,7 @@ class GoveeLight:
         '''Get the current scene of the light.'''
         mode = await self.get_mode()
         if isinstance(mode, SceneMode):
-            return self.scene_info.get_scene(mode.index)
+            return self.scene_info.get_scene(mode.code)
         return None
     
     async def set_scene(self, scene: str|int):

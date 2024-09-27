@@ -1,6 +1,13 @@
 # Govee H7015
 These are BLE-only RGB string lights with 15 discrete individually addressable bulbs/segments. They are controlled by a Govee app and have no IR or RF remote. Since I'm not a masochist and don't want to call a REST API to control a local bluetooth device, I reverse engineered the protocol and wrote a python library to control them.
 
+The bulk of the insights I've gathered are in [research](./research.md).
+
+To look at the raw notes and snoop logs, see [raw](./raw.log). This is not intended to be particularly readable, mostly just documentation of my process.
+
+## Warning
+In poking the various registers, I've managed to softlock my device multiple times which required removing the power to get out. Nothing so far has bricked it, but I can't make any guarantees. You use raw commands at your own risk.
+
 ## Usage
 ### MQTT
 ```bash
@@ -48,20 +55,47 @@ python govee.py
 ```
 Scans for compatible Govee devices and enters a command prompt tailored for reverse-engineering. A custom command language is used to send commands to the device.
 
-#### Command languageoptional
-Acts like a very loose assembly language. Numbers are always hex and keywords get replaced with their hex equivalents.
-r read (aa)
-w write (33)
-prefix / change / suffix... eg r05/aa,bb,cc/01 = queue commands aa05aa01 aa05bb01 aa05cc01
-xx-yy = range of values
-    w0504/00-ff = send 255 write commands to 0504 with successive values 00-ff
-scene = 0504 eg w scene 10 = 33050410
-param = 04
-restart = w 0e 00 or restart xx = w 0e xx
-Spaces are mostly ignored except when reading keywords.
+#### Command language
+Very loose command language with no validation. Numbers are always hex and keywords get replaced with their byte equivalents.
+- `r` read (`aa`)
+- `w` write (33)
+- prefix / change / suffix... eg `r05/aa,bb,cc/01` = queue commands `aa05aa01` `aa05bb01` `aa05cc01`
+- `xx-yy` = range of values
+    `w0504/00-ff` = send 255 write commands to `0504` with successive values `00-ff`
+- `scene` = `0504` eg `w scene 10` = `33050410`
+- `param` = `04`
+- `restart` = `w 0e 00` or `restart xx` = `w 0e xx`
+- Spaces are mostly ignored except for keyword word boundaries.
 
-## Todo
-- [ ] 
+### Consolidate
+```bash
+python consolidate.py
+```
+Consolidates the raw data into a more readable format. This is a one-time operation and is not intended to be run regularly.
+
+## Todoscene 
+- [x] Map registers (partially complete)
+- [x] MQTT client to act as a persistent bridge.
+- [x] Set the color and brightness of segment subsets.
+- [x] Get current colors and brightness of segments from device.
+- [x] Set a parameterized scene.
+- [x] Clean up API dump data ([jsons](./jsons/) -> [scenes](./scenes/)).
+- [x] Set scenes by name.
+- [x] Use snoop log to get [DUNE collaboration scenes](./collaboration.json).
+- [ ] Implement color temperature feature.
+- [ ] Reverse engineer scene param encoding (try DIY scenes in the app?).
+- [ ] Finish mapping where scene param data actually goes.
+- [ ] Able to extract all scene data from the device.
+- [ ] What do sleep, wake, and timer actually do?
+- [ ] Better understand color buffer in register `a5xx`.
+- [ ] Distinguish `w mode 05` "mic mode" and `a5` "audio mode".
+  - [ ] Reverse engineer them too.
+
+### Low priority questions
+- [ ] What are the extra services and characteristics?
+- [ ] Unknown registers: `0f`, `11`, `12`, `23`, `40`, `41`, `ee`, `ef`, `ff`.
+- [ ] What are the extra `ea86` bytes appended to the little-endian MAC in register `0702`?
+- [ ] Why is the HW version repeated in `06` and `0703`?
 
 ## Credits
 - [govee_ble_lights (Homeassistant)](https://github.com/Beshelmek/govee_ble_lights/)
