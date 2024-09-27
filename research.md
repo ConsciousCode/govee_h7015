@@ -112,11 +112,10 @@ This is the map of registers I've found so far. The register address is in hex, 
 - `a3` = ""
   - 1 byte `00:01`, unknown effect
 - `a5` color buffer?
-  - All sub-registers are 12 bytes long, almost always 3 units of 1 brightness byte with 3 rgb bytes.
+  - All sub-registers are 12 bytes long, almost always 3 units of 1 brightness (%) byte with 3 rgb bytes.
   - `xx010101` is used as an "undefined" color and fills the unused subregisters
   - The buffer isn't typically cleared when the mode changes, relevant bytes are just overwritten.
   - `00` sub-register seems to be special-use
-  - Sub-registers `01-ff` are composed of 3 units of brightness (%) + rrggbb
   - `?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? tttt`
     - `tttt` = little-endian color temperature in mode `15` `cccc != 0`
   - Segment block
