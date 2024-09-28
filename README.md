@@ -39,13 +39,18 @@ Starts an MQTT client that listens for commands to control the lights. I've made
 - `scene` - Get or set the current scene (`a3` command with param data + `w0504xxxx`).
   - This can be `Category - Scene`, `Scene`, or a (possibly hex with 0x) id. Case and whitespace insensitive.
 - `scenes` - Readonly list of scenes and their ids, `{Category: {Scene: ID|{"code": code, "diy": diyCode}}}`.
-- `brightness` - Get or set the brightness level of a subset of segments.
-- `color` - Get or set the color of a subset of segments.
-- `peek` - Read a register or range of registers.
+- `brightness` - Get or set the brightness level of all segments if it's the same, else `null`.
+- `color` - Get or set the color of all segments if it's the same, else `null`.
+  - Note that if their brightness isn't the same, the API will still say it's in segment mode.
+- `peek` - Read a register or range of registers (`33`).
   - Accepts a comma-separated list of hex registers or ranges.
-- `poke` - Write a register.2
+- `multi` - Initiate a multi-packet write command (`a5`) which writes scene parameters.
+  - Accepts *hex* data, not base64.
+
+#### Dangerous commands
+**USE AT YOUR OWN RISK**
+- `poke` - Write a register (`33`).
   - Accepts a space-separated hex register address and hex data to write.
-- `multi` - Initiate a multi-write command (`a5`).
 - `raw` - Send raw data to the device.
 - `asm` - Send commands from the command language to the device.
 
@@ -73,7 +78,7 @@ python consolidate.py
 ```
 Consolidates the raw data into a more readable format. This is a one-time operation and is not intended to be run regularly.
 
-## Todoscene 
+## Todo 
 - [x] Map registers (partially complete)
 - [x] MQTT client to act as a persistent bridge.
 - [x] Set the color and brightness of segment subsets.
@@ -93,7 +98,7 @@ Consolidates the raw data into a more readable format. This is a one-time operat
 
 ### Low priority questions
 - [ ] What are the extra services and characteristics?
-- [ ] Unknown registers: `0f`, `11`, `12`, `23`, `40`, `41`, `ee`, `ef`, `ff`.
+- [ ] Unknown registers: `0f`, `11`, `12`, `23`, `40`, `ee`, `ef`, `ff`.
 - [ ] What are the extra `ea86` bytes appended to the little-endian MAC in register `0702`?
 - [ ] Why is the HW version repeated in `06` and `0703`?
 

@@ -2,10 +2,8 @@ import asyncio
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Coroutine, Final, Generator, Iterable, NamedTuple, Optional
+from typing import Awaitable, Callable, Coroutine, Final, Generator, Iterable, Literal, NamedTuple, Optional, overload
 from bleak import BleakScanner, BleakClient
-from bleak.backends.characteristic import BleakGATTCharacteristic
-from bleak.exc import BleakDeviceNotFoundError
 from aioconsole import ainput
 import re
 import traceback as tb
@@ -107,7 +105,7 @@ SEGMENT_OFFSET: Final = 3
 '''Segment offset in the color buffer.'''
 
 SUBREGISTER_COLORS: Final = 3
-'''Number of colors in a color register sub-register.'''
+'''Number of colors in a color buffer sub-register.'''
 
 MIN_BRIGHT: Final = 0
 '''Minimum brightness value.'''
@@ -117,7 +115,9 @@ MAX_MESSAGE: Final = 20
 '''Largest size of a message (including checksum).'''
 
 MIN_TEMP: Final = 2000
+'''Minimum color temperature.'''
 MAX_TEMP: Final = 8800
+'''Maximum color temperature.'''
 
 SCENE_ID: Final = {
     # From reverse engineering repo
@@ -215,18 +215,16 @@ def conv_byte(*bs: BytesLike) -> Generator[int, None, None]:
         match b:
             case int()|bool(): yield int(b)
             case None: pass
+            case _ if isinstance(b, Iterable):
+                yield from b
+            
             case _:
-                if isinstance(b, Iterable):
-                    yield from b
-                else:
-                    raise TypeError(f"Invalid type for byte conversion: {type(b)}")
+                raise TypeError(f"Invalid type for byte conversion: {type(b)}")
 
 def print_conv(*bs: BytesLike):
     conv = bytes(conv_byte(*bs))
     print(bytes([
-        *conv,
-        *b'\0'*(MAX_MESSAGE - 1 - len(conv)),
-        checksum(conv)
+        *conv, *[0]*(MAX_MESSAGE - 1 - len(conv)), checksum(conv)
     ]).hex())
 
 def register(reg: int):
@@ -399,37 +397,42 @@ class SceneInfo:
                 for cat in self.categories.values()
         }
 
+def parse_packet(data: bytes):
+    cmd = data[0]
+    ro = ro = 1 if cmd == CMD_MULTI else 2 + (data[1] in MULTI_REG)
+    return cmd, data[:ro], data[ro:]
+
 class GoveeLight:
-    address: str
     tg: asyncio.TaskGroup
+    '''Task group for managing futures.'''
     client: BleakClient
-    
+    '''Bluetooth client.'''
     pending: asyncio.Queue[bytes]
     '''Queue of commands pending a response.'''
-    listeners: defaultdict[bytes, list[asyncio.Future[bytes]]]
+    futures: defaultdict[bytes, list[asyncio.Future[bytes]]]
     '''Map of commands to their listeners.'''
+    subscribed: defaultdict[str, list[Callable]]
+    '''Map of event subscriptions.'''
     state: dict[int, bytes]
     '''Current state of the light.'''
-    color_buffer: dict[int, bytes]
     
     def __init__(self, name: str, address: str):
-        if m := GOVEE_RE.match(name):
-            self.name = m[1]
-        else:
+        m = GOVEE_RE.match(name)
+        if m is None:
             raise ValueError(f"Invalid Govee name: {name}")
-        self.address = address
+        
+        self.name = m[1]
         self.tg = asyncio.TaskGroup()
         self.client = BleakClient(address)
-        
         self.pending = asyncio.Queue()
-        self.listeners = defaultdict(list)
+        self.futures = defaultdict(list)
+        self.subscribed = defaultdict(list)
         self.state = {}
-        self.color_buffer = {}
     
     async def __aenter__(self):
         await self.tg.__aenter__()
         await self.client.connect()
-        _LOGGER.info("Connected to Govee BLE device: %s", self.address)
+        _LOGGER.info("Connected to Govee BLE device: %s", self.client.address)
         await self.client.start_notify(CHAR_RECV, self._on_notify)
         return self
     
@@ -437,66 +440,79 @@ class GoveeLight:
         await self.tg.__aexit__(*exc)
         await self.client.disconnect()
     
-    async def _on_notify(self, sender: BleakGATTCharacteristic, data: bytearray):
-        if sender.uuid != CHAR_RECV:
-            _LOGGER.warning(
-                "Notice from unexpected characteristic (%s): %s", {
-                    CHAR_SEND: "control"
-                }.get(sender.uuid, sender.uuid),
-                data.hex()
-            )
+    async def _on_notify(self, sender, ba: bytearray):
+        if len(ba) < 3:
+            return _LOGGER.error("Invalid data: %s", ba.hex())
         
-        if checksum(data) != 0:
-            return _LOGGER.error("Checksum error: %s", data.hex())
+        if checksum(ba) != 0:
+            self.emit("error", "checksum", bytes(ba))
+            return _LOGGER.error("Checksum error: %s", ba.hex())
         
-        if not data.startswith((b'\xaa', b'\x33', b'\xa3')):
-            return _LOGGER.error("Unexpected data: %s", data.rstrip(b'\0').hex())
+        data = bytes(ba[:-1].rstrip(b'\0'))
+        cmd = data[0]
         
-        if len(data) < 3:
-            return _LOGGER.error("Invalid data: %s", data.hex())
+        if cmd not in {CMD_READ, CMD_WRITE, CMD_MULTI}:
+            return _LOGGER.error("Unexpected data: %s", data.hex())
         
-        bd = bytes(data[:-1]).rstrip(b'\0')
-        reg = 2 + (bd[1] in MULTI_REG)
-        key, val = bd[:reg], bd[reg:]
-        if key[0] == CMD_READ:
-            if key[1] == REG_BUFFER:
-                kk = key[2] if len(key) > 2 else 0
-                self.color_buffer[kk] = val
-            else:
-                self.state[int.from_bytes(key[1:])] = bytes(val)
+        cmd, key, val = parse_packet(data)
+        if cmd == CMD_READ:
+            self.state[int.from_bytes(key[1:])] = bytes(val)
             if key[1] != REG_POWER:
                 _LOGGER.debug("Notify (%s): %s", key.hex(), val.hex())
-        elif key[0] not in {CMD_WRITE, CMD_MULTI}:
-            _LOGGER.warning("Unknown notify: %s", bd.hex())
-        
-        if futures := self.listeners.pop(key, []):
-            while not self.pending.empty():
-                nkey = await self.pending.get()
-                if nkey == key:
-                    break
-                
-                if rejected := self.listeners.pop(nkey, []):
-                    _LOGGER.info("Timeout for monitored %s", nkey.hex())
-                
-                for future in rejected:
-                    future.set_exception(
-                        TimeoutError("Another response received first")
-                    )
-            else:
-                return _LOGGER.warning("Unexpected response: %s", bd)
-            
-            for future in futures:
-                future.set_result(val)
         else:
-            _LOGGER.info("Response with no listeners: %s", bd.hex())
+            _LOGGER.warning("Unknown notify: %s", data.hex())
+        
+        self.emit("recv", cmd, int.from_bytes(key[1:]), val)
+        
+        while not self.pending.empty():
+            nkey = await self.pending.get()
+            if nkey == key:
+                break
+            
+            self.emit("error", "timeout", nkey)
+            for future in self.futures.pop(nkey, []):
+                future.set_exception(
+                    TimeoutError("Another response received first")
+                )
+        else:
+            self.emit("error", "unexpected", key)
+            return _LOGGER.warning("Unexpected response: %s", data)
+        
+        for future in self.futures.pop(key, []):
+            future.set_result(val)
+    
+    @overload
+    def on(self, event: Literal['recv'], callback: Callable[[int, int, bytes], Awaitable]) -> None:
+        ...
+    @overload
+    def on(self, event: Literal['send'], callback: Callable[[int, int, bytes], Awaitable]) -> None:
+        ...
+    @overload
+    def on(self, event: Literal['error'], callback: Callable[[str, bytes], Awaitable]) -> None:
+        ...
+    def on(self, event: str, callback: Callable) -> None:
+        self.subscribed[event].append(callback)
+    
+    @overload
+    def emit(self, event: Literal['send'], cmd: int, reg: int, data: bytes, /) -> None:
+        ...
+    @overload
+    def emit(self, event: Literal['recv'], cmd: int, reg: int, data: bytes, /) -> None:
+        ...
+    @overload
+    def emit(self, event: Literal['error'], reason: str, data: bytes, /) -> None:
+        ...
+    def emit(self, event: Literal['send', 'recv', 'error'], *args):
+        for callback in self.subscribed[event]:
+            self.tg.create_task(callback(*args))
     
     async def send_raw(self, data: bytes):
         '''Raw send with zero padding and checksum.'''
         if len(data) >= MAX_MESSAGE:
             raise ValueError("Command too long")
+        k, v, d = parse_packet(data)
+        self.emit("send", k, int.from_bytes(v[1:]), d)
         data += bytes([*[0]*(19 - len(data)), checksum(data)])
-        if not data.startswith(b"\xaa\x01"):
-            _LOGGER.debug("Sending: %s", data.hex())
         await self.client.write_gatt_char(CHAR_SEND, data)
     
     async def send_data(self, *parts: BytesLike):
@@ -547,7 +563,7 @@ class GoveeLight:
         target = bytes([cmd, *register(reg)])
         await self.pending.put(target)
         future = asyncio.Future()
-        self.listeners[target].append(future)
+        self.futures[target].append(future)
         await send
         return await future
     
@@ -623,7 +639,7 @@ class GoveeLight:
     
     @cached_property
     def scene_info(self) -> SceneInfo:
-        return SceneInfo(f"scenes/{self.name}.json")
+        return SceneInfo(f"{self.name}.json")
     
     def expand_segments(self, segments: int):
         return (segments&0x7fff).to_bytes(2, 'little')
@@ -682,15 +698,7 @@ class GoveeLight:
         )
 
 @asynccontextmanager
-async def scan(mac: Optional[str]=None):
-    if False and mac:
-        print("Connecting directly...")
-        try:
-            async with GoveeLight(mac) as light:
-                yield light
-        except BleakDeviceNotFoundError:
-            _LOGGER.warning("Direct MAC connection timed out")
-    
+async def scan():
     print("Scanning...")
     for dev in await BleakScanner.discover():
         if dev.name is None:
@@ -750,11 +758,9 @@ def parse_cmd(cmd: str):
         else:
             yield prefix + asm_cmd(part) + suffix
 
-MAC = 'D3:39:32:35:1A:88'
-
 async def main():
     last = 0
-    async with scan(MAC) as light:
+    async with scan() as light:
         light.keepalive()
         
         while True:

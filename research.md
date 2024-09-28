@@ -23,6 +23,7 @@ This is the map of registers I've found so far. The register address is in hex, 
 - `01` on/off state (also used for keepalive)
   - `01` is "on", all other values are "off", normalized to `00`
 - `04` dimmer (in percent)
+  - Note: 0% is not off, it's just very dim.
 - `05` mode
   - `04` scene
     - All of these were found through poking registers, they may be invalid states of the firmware.
@@ -116,7 +117,7 @@ This is the map of registers I've found so far. The register address is in hex, 
   - `xx010101` is used as an "undefined" color and fills the unused subregisters
   - The buffer isn't typically cleared when the mode changes, relevant bytes are just overwritten.
   - `00` sub-register seems to be special-use
-  - `?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? tttt`
+  - `00` = `?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? tttt`
     - `tttt` = little-endian color temperature in mode `15` `cccc != 0`
   - Segment block
     - `01` segments 1-3
@@ -140,6 +141,12 @@ This is the map of registers I've found so far. The register address is in hex, 
   - `03` = pulses red
   - `05` = set to this when animation is playing? writing this pauses animation
   - `xx` = pause animation
+
+## Scenes
+```bash
+curl "https://app2.govee.com/appsku/v1/light-effect-libraries?sku=H7015" -H 'AppVersion: 5.6.01' -s > H7015.json
+```
+From [this thread](https://github.com/egold555/Govee-Reverse-Engineering/issues/11) allows downloading scene data dumps from the govee REST API, which is probably how the hass repo got their data.
 
 ## Sources
 - [Homeassistant](https://github.com/Beshelmek/govee_ble_lights)
