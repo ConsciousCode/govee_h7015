@@ -63,7 +63,7 @@ Scans for compatible Govee devices and enters a command prompt tailored for reve
 #### Command language
 Very loose command language with no validation. Numbers are always hex and keywords get replaced with their byte equivalents.
 - `r` read (`aa`)
-- `w` write (33)
+- `w` write (`33`)
 - prefix / change / suffix... eg `r05/aa,bb,cc/01` = queue commands `aa05aa01` `aa05bb01` `aa05cc01`
 - `xx-yy` = range of values
     `w0504/00-ff` = send 255 write commands to `0504` with successive values `00-ff`
