@@ -1,7 +1,7 @@
 from dataclasses import asdict
 import json
 import re
-from typing import cast
+from typing import Counter, cast
 import asyncio
 import traceback as tb
 
@@ -55,6 +55,10 @@ class GoveeMQTT:
         self.ack = stat + ack
         self.result = stat + result
         self.error = stat + error
+
+        # Whether or not power status was requested externally
+        #  Reads from power status are used as a heartbeat
+        self.pending_power = False
     
     async def __aenter__(self):
         await self.client.__aenter__()
@@ -76,7 +80,6 @@ class GoveeMQTT:
                 case str(payload): pass
                 case up: raise ValueError(f"What is {up!r}?")
             
-            print(self.result)
             await self.client.publish(self.result, json.dumps(
                 await self.handle_command(
                     message.topic.value.removeprefix(self.prefix),
@@ -87,6 +90,12 @@ class GoveeMQTT:
     async def on_recv(self, cmd: int, key: int, data: bytes):
         match cmd:
             case govee.CMD_READ:
+                if key == govee.REG_POWER:
+                    if self.pending_power:
+                        self.pending_power = False
+                    else:
+                        return
+                
                 await self.client.publish(self.notify, json.dumps({
                     "register": key,
                     "data": data.hex()
@@ -123,6 +132,8 @@ class GoveeMQTT:
         try:
             match m[1].lower():
                 case "power":
+                    self.pending_power = True
+
                     match data.strip().lower():
                         case "toggle":
                             await self.dev.set_power(not await self.dev.get_power())
