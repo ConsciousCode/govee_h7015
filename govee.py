@@ -455,7 +455,7 @@ class GoveeLight:
             return _LOGGER.error("Unexpected data: %s", data.hex())
         
         cmd, key, val = parse_packet(data)
-        if cmd == CMD_READ:
+        if cmd == CMD_READ or cmd == CMD_WRITE:
             self.state[int.from_bytes(key[1:])] = bytes(val)
             if key[1] != REG_POWER:
                 _LOGGER.debug("Notify (%s): %s", key.hex(), val.hex())

@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import json
 import re
 from typing import cast
@@ -75,6 +76,7 @@ class GoveeMQTT:
                 case str(payload): pass
                 case up: raise ValueError(f"What is {up!r}?")
             
+            print(self.result)
             await self.client.publish(self.result, json.dumps(
                 await self.handle_command(
                     message.topic.value.removeprefix(self.prefix),
@@ -119,7 +121,7 @@ class GoveeMQTT:
             return {"ERROR": f"Invalid command: {cmd}"}
         
         try:
-            match m[1]:
+            match m[1].lower():
                 case "power":
                     match data.strip().lower():
                         case "toggle":
@@ -208,11 +210,11 @@ class GoveeMQTT:
                     return {"Restart": await self.dev.get_reason()}
                 
                 case "status":
-                    if m[3] is None or m[3] == "0":
+                    if m[2] is None or m[2] == "0":
                         return {
                             "Power": await self.dev.get_power(),
                             "Dimmer": await self.dev.get_dimmer(),
-                            "Mode": await self.dev.get_mode(),
+                            "Mode": asdict(await self.dev.get_mode()),
                             "Version": (
                                 await self.dev.get_version(),
                                 await self.dev.get_hwver(),
@@ -368,10 +370,7 @@ async def main():
         light.keepalive()
         mqtt = GoveeMQTT(light,
             broker="theseus.home.arpa",
-            topic="govee",
-            command="cmnd",
-            stat="stat",
-            result="result"
+            topic="govee"
         )
         async with mqtt:
             await mqtt.serve()
