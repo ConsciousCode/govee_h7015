@@ -606,7 +606,7 @@ class GoveeLight:
     
     async def get_mode(self) -> Mode:
         mode = await self.cache_read(REG_MODE)
-        m = mode[0]
+        m = mode[0] if mode else MODE_SCENE
         if m == MODE_SCENE:
             index = int.from_bytes(mode[1:], 'little')
             name = SCENE_NAME.get(index, "Unknown")
@@ -667,7 +667,7 @@ class GoveeLight:
             raise ValueError(f"Unknown scene: {scene}")
         
         if param: await self.multi(param)
-        print_conv(CMD_WRITE, REG_MODE, MODE_SCENE, code.to_bytes(2, 'little'))
+        #print_conv(CMD_WRITE, REG_MODE, MODE_SCENE, code.to_bytes(2, 'little'))
         await self.write(REG_MODE, MODE_SCENE, code.to_bytes(2, 'little'))
     
     async def get_segments(self, segments: int=-1):

@@ -1,7 +1,7 @@
 from dataclasses import asdict
 import json
 import re
-from typing import Counter, cast
+from typing import cast
 import asyncio
 import traceback as tb
 
@@ -23,7 +23,7 @@ TASMOTA_NAMES = [
 ]
 
 HEX_RE = re.compile(r'0x([\da-f]+)')
-CMD_RE = re.compile(r'([a-z]+)(\d+)?')
+CMD_RE = re.compile(r'(\w+)(\d+)?')
 COLOR_RE = re.compile(r'''
     \#?([0-9a-f]{3}) # Hexadecimal
    |\#?([0-9a-f]{6}) # Hexadecimal
@@ -130,7 +130,7 @@ class GoveeMQTT:
     async def handle_command(self, cmd: str, data: str):
         m = CMD_RE.match(cmd)
         if m is None:
-            return {"ERROR": f"Invalid command: {cmd}"}
+            return {"ERROR": f"Invalid command: {cmd!r}"}
         
         try:
             match m[1].lower():
