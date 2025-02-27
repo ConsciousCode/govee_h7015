@@ -113,6 +113,9 @@ class GoveeMQTT:
                 }))
     
     async def on_send(self, cmd: int, key: int, data: bytes):
+        if cmd == govee.CMD_READ and not self.pending_power:
+            return
+        
         await self.client.publish(self.send, json.dumps({
             "cmd": cmd,
             "register": key,
