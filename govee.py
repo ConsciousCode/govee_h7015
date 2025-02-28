@@ -598,7 +598,7 @@ class GoveeLight:
         await self.write(REG_POWER, bytes([value]))
     
     async def get_dimmer(self) -> float:
-        return (await self.cache_read(REG_DIMMER))[0] / MAX_DIM
+        return (await self.cache_read(REG_DIMMER) or b'\0')[0] / MAX_DIM
     
     async def set_dimmer(self, value: float):
         assert_range(value, "Dimmer", 0, 1)
@@ -623,7 +623,7 @@ class GoveeLight:
         raise ValueError(f"Unknown mode: {m}")
     
     async def get_reason(self) -> int:
-        return (await self.cache_read(REG_POWER))[0]
+        return (await self.cache_read(REG_POWER) or b'\0')[0]
     
     async def get_version(self) -> str:
         return (await self.cache_read(REG_VERSION)).decode()
