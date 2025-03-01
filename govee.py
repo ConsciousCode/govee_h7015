@@ -407,8 +407,6 @@ class GoveeLight:
     '''Task group for managing futures.'''
     client: BleakClient
     '''Bluetooth client.'''
-    pending: asyncio.Queue[bytes]
-    '''Queue of commands pending a response.'''
     futures: defaultdict[bytes, list[asyncio.Future[bytes]]]
     '''Map of commands to their listeners.'''
     subscribed: defaultdict[str, list[Callable]]
@@ -424,7 +422,6 @@ class GoveeLight:
         self.name = m[1]
         self.tg = asyncio.TaskGroup()
         self.client = BleakClient(address)
-        self.pending = asyncio.Queue()
         self.futures = defaultdict(list)
         self.subscribed = defaultdict(list)
         self.state = {}
@@ -448,38 +445,25 @@ class GoveeLight:
             self.emit("error", "checksum", bytes(ba))
             return _LOGGER.error("Checksum error: %s", ba.hex())
         
-        data = bytes(ba[:-1].rstrip(b'\0'))
+        data = bytes(ba[:-1].rstrip(b'\0')) or b'\0'
         cmd = data[0]
         
         if cmd not in {CMD_READ, CMD_WRITE, CMD_MULTI}:
             return _LOGGER.error("Unexpected data: %s", data.hex())
         
         cmd, key, val = parse_packet(data)
-        if cmd == CMD_READ or cmd == CMD_WRITE:
+        if cmd == CMD_READ:
             self.state[int.from_bytes(key[1:])] = bytes(val)
             if key[1] != REG_POWER:
                 _LOGGER.debug("Notify (%s): %s", key.hex(), val.hex())
-        else:
+        elif cmd == CMD_MULTI:
             _LOGGER.warning("Unknown notify: %s", data.hex())
+        # Note: CMD_WRITE has ACK but no value
         
         self.emit("recv", cmd, int.from_bytes(key[1:]), val)
         
-        while not self.pending.empty():
-            nkey = await self.pending.get()
-            if nkey == key:
-                break
-            
-            self.emit("error", "timeout", nkey)
-            for future in self.futures.pop(nkey, []):
-                future.set_exception(
-                    TimeoutError("Another response received first")
-                )
-        else:
-            self.emit("error", "unexpected", key)
-            return _LOGGER.warning("Unexpected response: %s", data)
-        
-        for future in self.futures.pop(key, []):
-            future.set_result(val)
+        if (fs := self.futures.get(key)):
+            fs.pop(0).set_result(val)
     
     @overload
     def on(self, event: Literal['recv'], callback: Callable[[int, int, bytes], Awaitable]) -> None:
@@ -513,7 +497,7 @@ class GoveeLight:
         k, v, d = parse_packet(data)
         self.emit("send", k, int.from_bytes(v[1:]), d)
         data += bytes([*[0]*(19 - len(data)), checksum(data)])
-        await self.client.write_gatt_char(CHAR_SEND, data)
+        await self.client.write_gatt_char(CHAR_SEND, data, response=True)
     
     async def send_data(self, *parts: BytesLike):
         '''Send data with zero padding and checksum.'''
@@ -535,7 +519,9 @@ class GoveeLight:
         while True:
             await asyncio.sleep(2)
             try:
-                await self.read(REG_POWER)
+                # Don't need to heartbeat if we're waiting for a response
+                if not any(self.futures.values()):
+                    await self.read(REG_POWER)
             except TimeoutError:
                 _LOGGER.warning("Heartbeat timeout")
     
@@ -548,24 +534,22 @@ class GoveeLight:
         INIT = PAYLOAD - 1 - 1 - 1 # 01, count, 02
         chunks = (len(data) - INIT + (PAYLOAD - 1)) // PAYLOAD
         
-        #print_conv(CMD_MULTI, 0, 1, chunks + 1, 2, data[:INIT])
         await self.send_data(CMD_MULTI, 0, 1, chunks + 1, 2, data[:INIT])
         
         # All others: a3 i ...data checksum
         for i, chunk in enumerate(batch_bytes(data[INIT:], PAYLOAD), 1):
             if i == chunks:
                 i = 0xff # Last packet has index 0xff
-            #print_conv(CMD_MULTI, i, chunk)
             await self.send_data(CMD_MULTI, i, chunk)
     
     async def _ack(self, cmd: int, reg: int, send: Coroutine) -> bytes:
         '''Read with response or write with ACK.'''
         target = bytes([cmd, *register(reg)])
-        await self.pending.put(target)
         future = asyncio.Future()
         self.futures[target].append(future)
         await send
-        return await future
+        async with asyncio.timeout(5):
+            return await future
     
     async def read(self, reg: int) -> bytes:
         '''Read from a register.'''
@@ -573,6 +557,8 @@ class GoveeLight:
     
     async def write(self, reg: int, *parts: BytesLike):
         '''Write to a register.'''
+        # Invalidate the cache
+        self.state.pop(reg, None)
         await self._ack(CMD_WRITE, reg, self.send_write(reg, *parts))
     
     async def multi(self, data: bytes):
@@ -581,9 +567,15 @@ class GoveeLight:
         await self._ack(CMD_MULTI, 2, self.send_multi(data))
     
     async def cache_read(self, reg: int):
-        if reg not in self.state:
+        if reg in self.state:
+            return self.state[reg]
+        try:
             return await self.read(reg)
-        return self.state[reg]
+        except asyncio.TimeoutError:
+            _LOGGER.warning("Timeout reading %s", reg)
+            if reg in self.state:
+                return self.state[reg]
+            raise
     
     async def get_buffer(self, index: int):
         r, c = divmod(index, 3)
@@ -592,7 +584,7 @@ class GoveeLight:
         return buf[c:c + 4]
     
     async def get_power(self) -> bool:
-        return bool(await self.cache_read(REG_POWER))
+        return bool((await self.cache_read(REG_POWER) or b'\0')[0])
     
     async def set_power(self, value: bool):
         await self.write(REG_POWER, bytes([value]))
@@ -658,6 +650,7 @@ class GoveeLight:
     async def set_scene(self, scene: str|int):
         '''Set the scene of the light.'''
         
+        # Done by the app, probably unnecessary
         await self.read(REG_POWER)
         
         if si := self.scene_info.get_scene(scene):
@@ -667,7 +660,6 @@ class GoveeLight:
             raise ValueError(f"Unknown scene: {scene}")
         
         if param: await self.multi(param)
-        #print_conv(CMD_WRITE, REG_MODE, MODE_SCENE, code.to_bytes(2, 'little'))
         await self.write(REG_MODE, MODE_SCENE, code.to_bytes(2, 'little'))
     
     async def get_segments(self, segments: int=-1):
