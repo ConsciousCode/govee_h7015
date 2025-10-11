@@ -22,6 +22,7 @@ The Govee firmware uses a register-based design.
 This is the map of registers I've found so far. The register address is in hex, and the contents are in hex unless otherwise noted. Some of this is from the snoop log while others are from fuzzing commands like `r/00-ff` to see what responds.
 - `01` on/off state (also used for keepalive)
   - `01` is "on", all other values are "off", normalized to `00`
+- `02` pseudo-register which multi-packet write commands ACK from.
 - `04` dimmer (in percent)
   - Note: 0% is not off, it's just very dim.
 - `05` mode
@@ -46,7 +47,7 @@ This is the map of registers I've found so far. The register address is in hex, 
     - `1000` quick discrete hue rotation
     - `1500` seizure flash between blue and white
     - `15ff` twinkles between soft pink and blue
-    - `1600` chaser rotating between blue and pur3ple hues
+    - `1600` chaser rotating between blue and purple hues
     - `2300` bright slow pulsating between blue and white, reminds me of ice
     - `3f00` illumination
     - `4000` chaser with rotating hues
